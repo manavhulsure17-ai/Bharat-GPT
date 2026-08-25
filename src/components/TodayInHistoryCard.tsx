@@ -27,6 +27,7 @@ import {
   Clock,
   MapPin,
   Flame,
+  Music,
 } from "lucide-react";
 import {
   HistoryCategory,
@@ -40,7 +41,10 @@ import {
   getLocalHistoryForDate,
   TodayInHistoryResponse,
 } from "../services/historyService";
-import { soundscape } from "../services/audioSynth";
+import { soundscape, SpeechState } from "../services/audioSynth";
+import { AudioTTSPlayerBar } from "./AudioTTSPlayerBar";
+import { toast } from "../services/toastService";
+import { karmaService } from "../services/karmaService";
 
 interface TodayInHistoryCardProps {
   selectedLanguage: IndicLanguageCode;
@@ -61,10 +65,24 @@ export const TodayInHistoryCard: React.FC<TodayInHistoryCardProps> = ({
   const [selectedEventIndex, setSelectedEventIndex] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isExpanded, setIsExpanded] = useState<boolean>(true);
-  const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
   const [isSaved, setIsSaved] = useState<boolean>(false);
   const [isCopied, setIsCopied] = useState<boolean>(false);
   const [showDatePicker, setShowDatePicker] = useState<boolean>(false);
+
+  // Audio Playback & TTS Engine States
+  const [speechState, setSpeechState] = useState<SpeechState>({
+    isSpeaking: false,
+    isPaused: false,
+    speakingId: null,
+    activeLanguage: selectedLanguage,
+    currentChunk: 0,
+    totalChunks: 1,
+    progressPercent: 0,
+    playbackRate: 0.95,
+  });
+  const [selectedSpeed, setSelectedSpeed] = useState<number>(0.95);
+  const [isDroneEnabled, setIsDroneEnabled] = useState<boolean>(false);
+  const [narrationMode, setNarrationMode] = useState<string>("full");
 
   // Load history data when date, language, or category changes
   useEffect(() => {
@@ -105,36 +123,78 @@ export const TodayInHistoryCard: React.FC<TodayInHistoryCardProps> = ({
 
   useEffect(() => {
     const unsubscribe = soundscape.subscribe((state) => {
-      if (state.speakingId === utteranceId && state.isSpeaking) {
-        setIsSpeaking(true);
-      } else if (!state.isSpeaking || state.speakingId !== utteranceId) {
-        setIsSpeaking(false);
+      if (state.speakingId === utteranceId) {
+        setSpeechState(state);
+      } else {
+        setSpeechState((prev) => ({
+          ...prev,
+          isSpeaking: false,
+          isPaused: false,
+          speakingId: null,
+        }));
       }
     });
     return () => unsubscribe();
   }, [utteranceId]);
 
-  const handleToggleNarration = () => {
-    if (isSpeaking) {
-      soundscape.stopSpeaking();
-      setIsSpeaking(false);
-      return;
-    }
-
+  const handleStartNarration = (
+    mode: string = narrationMode,
+    speed: number = selectedSpeed,
+    drone: boolean = isDroneEnabled
+  ) => {
     if (!activeEvent) return;
 
-    setIsSpeaking(true);
     soundscape.playTempleBell();
+    karmaService.addKarma(20, `History Chronicle • ${activeEvent.title}`, "wisdom");
+    karmaService.recordActivity("dailyWisdomReadCount", 1);
 
-    const narrationText = `Today in Indian History for ${historyData.dateFormatted}. ${activeEvent.title}. Indic chronicle: ${activeEvent.indicTitle}. Era: ${activeEvent.era} (${activeEvent.year || ""}). ${activeEvent.summary}. Historical significance: ${activeEvent.detailedSignificance}. Key takeaways: ${activeEvent.keyTakeaways.join(". ")}`;
+    let narrationText = "";
+    if (mode === "summary") {
+      narrationText = `Today in Indian History for ${historyData.dateFormatted}. ${activeEvent.title}. Indic chronicle: ${activeEvent.indicTitle || ""}. Era: ${activeEvent.era} (${activeEvent.year || ""}). Summary: ${activeEvent.summary}`;
+    } else if (mode === "takeaways") {
+      narrationText = `Key Historical Takeaways for ${activeEvent.title}. ${activeEvent.keyTakeaways.join(". ")}. Civilizational significance: ${activeEvent.detailedSignificance}`;
+    } else {
+      // Full chronicle
+      narrationText = `Today in Indian History for ${historyData.dateFormatted}. Milestone: ${activeEvent.title}. Indic chronicle: ${activeEvent.indicTitle || ""}. Era: ${activeEvent.era} ${activeEvent.year ? `(${activeEvent.year})` : ""}. Location: ${activeEvent.location || "Ancient Bharat"}. Summary: ${activeEvent.summary}. Historical significance: ${activeEvent.detailedSignificance}. Key takeaways: ${activeEvent.keyTakeaways.join(". ")}`;
+    }
 
     soundscape.speakText(
       narrationText,
       selectedLanguage,
       utteranceId,
-      () => setIsSpeaking(false),
-      () => setIsSpeaking(true)
+      () => {},
+      () => {},
+      {
+        rate: speed,
+        enableAmbientDrone: drone,
+      }
     );
+  };
+
+  const handlePauseNarration = () => {
+    soundscape.pauseSpeaking();
+  };
+
+  const handleResumeNarration = () => {
+    soundscape.resumeSpeaking();
+  };
+
+  const handleStopNarration = () => {
+    soundscape.stopSpeaking();
+  };
+
+  const handleSpeedChange = (speed: number) => {
+    setSelectedSpeed(speed);
+    if (speechState.isSpeaking || speechState.isPaused) {
+      handleStartNarration(narrationMode, speed, isDroneEnabled);
+    }
+  };
+
+  const handleToggleDrone = (enabled: boolean) => {
+    setIsDroneEnabled(enabled);
+    if (speechState.isSpeaking) {
+      soundscape.toggleTanpura(enabled, 0.12);
+    }
   };
 
   const handleSaveToVault = () => {
@@ -159,10 +219,11 @@ export const TodayInHistoryCard: React.FC<TodayInHistoryCardProps> = ({
 
   const handleShare = () => {
     if (!activeEvent) return;
-    const shareText = `📜 Today in Bharatiya History (${historyData.dateFormatted})\n\n🌟 ${activeEvent.title} (${activeEvent.indicTitle})\n🏛️ Era: ${activeEvent.era} | ${activeEvent.year || ""}\n📍 Location: ${activeEvent.location || "Bharat"}\n\n📖 Summary: ${activeEvent.summary}\n\n✨ Key Takeaways:\n${activeEvent.keyTakeaways.map((k) => `• ${k}`).join("\n")}\n\nExplore timeless Indian heritage on Bharat GPT!`;
+    const shareText = `📜 Today in Bharatiya History (${historyData.dateFormatted})\n\n🌟 ${activeEvent.title} (${activeEvent.indicTitle})\n🏛️ Era: ${activeEvent.era} | ${activeEvent.year || ""}\n📍 Location: ${activeEvent.location || "Bharat"}\n\n📖 Summary: ${activeEvent.summary}\n\n✨ Key Takeaways:\n${activeEvent.keyTakeaways.map((k) => `• ${k}`).join("\n")}\n\nExplore timeless Indian heritage on Prajna BharatGPT!`;
 
     navigator.clipboard.writeText(shareText);
     setIsCopied(true);
+    toast.success("Historical chronicle copied to clipboard!", { title: "Copied History" });
     setTimeout(() => setIsCopied(false), 2500);
   };
 
@@ -228,7 +289,7 @@ export const TodayInHistoryCard: React.FC<TodayInHistoryCardProps> = ({
       aria-label="Today in Bharatiya History and Vedic Calendar"
       className="w-full max-w-5xl mx-auto px-3 sm:px-4 pt-4"
     >
-      <div className="bg-gradient-to-b from-[#11192e] via-[#0d1424] to-[#0a0f1d] border-2 border-amber-500/40 rounded-3xl p-4 sm:p-7 shadow-2xl relative overflow-hidden transition-all duration-300">
+      <div className="bg-gradient-to-b from-[#11192e] via-[#0d1424] to-[#0a0f1d] border-2 border-amber-500/40 hover:border-amber-500/60 rounded-3xl p-4 sm:p-7 shadow-2xl hover:shadow-amber-500/10 hover:-translate-y-0.5 relative overflow-hidden transition-all duration-300">
         {/* Subtle Background Watermark */}
         <div className="absolute top-2 right-4 text-8xl font-royal text-amber-500/5 select-none pointer-events-none">
           इतिहास
@@ -354,7 +415,7 @@ export const TodayInHistoryCard: React.FC<TodayInHistoryCardProps> = ({
           <div className="mt-4 space-y-5 relative z-10 animate-fadeIn">
             {/* Vedic Panchang Tithi Banner */}
             {historyData.vedicPanchang && (
-              <div className="bg-slate-950/80 border border-amber-500/25 rounded-2xl p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="bg-slate-950/80 border border-amber-500/25 hover:border-amber-500/40 rounded-2xl p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3 text-xs shadow-md hover:shadow-lg hover:shadow-amber-500/10 hover:-translate-y-0.5 transition-all duration-300">
                 <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-amber-200">
                   <div className="flex items-center gap-1.5">
                     <Sun className="w-3.5 h-3.5 text-amber-400" />
@@ -398,10 +459,10 @@ export const TodayInHistoryCard: React.FC<TodayInHistoryCardProps> = ({
                 <button
                   key={cat.id}
                   onClick={() => setSelectedCategory(cat.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 hover:scale-[1.03] ${
                     selectedCategory === cat.id
                       ? "bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 font-bold"
-                      : "bg-slate-950/60 border border-amber-500/20 text-amber-300/80 hover:text-amber-100 hover:border-amber-400/40"
+                      : "bg-slate-950/60 border border-amber-500/20 text-amber-300/80 hover:text-amber-100 hover:border-amber-400/40 hover:shadow-sm"
                   }`}
                 >
                   {cat.icon}
@@ -420,7 +481,7 @@ export const TodayInHistoryCard: React.FC<TodayInHistoryCardProps> = ({
                       setSelectedEventIndex(idx);
                       soundscape.stopSpeaking();
                     }}
-                    className={`text-left p-3 rounded-2xl border transition-all text-xs space-y-1 ${
+                    className={`text-left p-3 rounded-2xl border transition-all duration-200 text-xs space-y-1 hover:-translate-y-0.5 hover:shadow-md hover:shadow-amber-500/10 hover:scale-[1.01] ${
                       selectedEventIndex === idx
                         ? "bg-amber-500/15 border-amber-400 ring-1 ring-amber-400/30 text-amber-100 shadow-md"
                         : "bg-slate-950/50 border-amber-500/20 text-amber-300/70 hover:border-amber-500/40 hover:text-amber-200"
@@ -447,7 +508,7 @@ export const TodayInHistoryCard: React.FC<TodayInHistoryCardProps> = ({
 
             {/* Active Featured Event Spotlight */}
             {activeEvent && (
-              <div className="bg-gradient-to-b from-[#141d33] to-[#0c1322] border-2 border-amber-500/30 rounded-2xl sm:rounded-3xl p-5 sm:p-7 shadow-xl space-y-5 relative">
+              <div className="bg-gradient-to-b from-[#141d33] to-[#0c1322] border-2 border-amber-500/30 hover:border-amber-500/50 rounded-2xl sm:rounded-3xl p-5 sm:p-7 shadow-xl hover:shadow-2xl hover:shadow-amber-500/15 hover:-translate-y-0.5 transition-all duration-300 space-y-5 relative">
                 {/* Event Top Badges */}
                 <div className="flex flex-wrap items-center justify-between gap-2.5 pb-3 border-b border-amber-500/20">
                   <div className="flex flex-wrap items-center gap-2">
@@ -478,28 +539,30 @@ export const TodayInHistoryCard: React.FC<TodayInHistoryCardProps> = ({
                     )}
                   </div>
 
-                  {/* Audio Speech Narration Toggle */}
-                  <button
-                    onClick={handleToggleNarration}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
-                      isSpeaking
-                        ? "bg-amber-500 text-slate-950 border-amber-300 font-bold animate-pulse shadow-md"
-                        : "bg-slate-900 text-amber-200 border-amber-500/30 hover:bg-amber-950/50 hover:border-amber-400"
-                    }`}
-                    title={isSpeaking ? "Pause Narration" : "Listen to history event narration"}
-                  >
-                    {isSpeaking ? (
-                      <>
-                        <VolumeX className="w-3.5 h-3.5" />
-                        <span>Pause Narration</span>
-                      </>
-                    ) : (
-                      <>
-                        <Volume2 className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Listen to History</span>
-                      </>
-                    )}
-                  </button>
+                  {/* Audio TTS Player Bar */}
+                  <AudioTTSPlayerBar
+                    speechState={speechState}
+                    onPlay={(mode, speed, drone) =>
+                      handleStartNarration(mode || narrationMode, speed || selectedSpeed, drone ?? isDroneEnabled)
+                    }
+                    onPause={handlePauseNarration}
+                    onResume={handleResumeNarration}
+                    onStop={handleStopNarration}
+                    onSpeedChange={handleSpeedChange}
+                    onToggleDrone={handleToggleDrone}
+                    selectedSpeed={selectedSpeed}
+                    isDroneEnabled={isDroneEnabled}
+                    modes={[
+                      { id: "full", label: "Complete Chronicle" },
+                      { id: "summary", label: "Quick Briefing" },
+                      { id: "takeaways", label: "Key Takeaways" },
+                    ]}
+                    activeMode={narrationMode}
+                    onModeChange={(m) => setNarrationMode(m)}
+                    title={activeEvent.title}
+                    subtitle={`Era: ${activeEvent.era} ${activeEvent.year ? `• Year: ${activeEvent.year}` : ""} • Audio Engine: ${selectedLanguage}`}
+                    theme="dark"
+                  />
                 </div>
 
                 {/* Event Heading & Indic Title */}
@@ -527,7 +590,7 @@ export const TodayInHistoryCard: React.FC<TodayInHistoryCardProps> = ({
 
                 {/* Key Takeaways & Philosophical Insights */}
                 {activeEvent.keyTakeaways && activeEvent.keyTakeaways.length > 0 && (
-                  <div className="bg-slate-950/70 border border-amber-500/25 rounded-2xl p-4 space-y-2">
+                  <div className="bg-slate-950/70 border border-amber-500/25 hover:border-amber-500/40 rounded-2xl p-4 space-y-2 shadow-inner hover:shadow-md hover:shadow-amber-500/10 hover:-translate-y-0.5 transition-all duration-300">
                     <h4 className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
                       <Sparkles className="w-3.5 h-3.5 text-amber-400" />
                       Key Civilizational Takeaways (मुख्य ऐतिहासिक अंतर्दृष्टि)
@@ -562,7 +625,7 @@ export const TodayInHistoryCard: React.FC<TodayInHistoryCardProps> = ({
 
                 {/* Bottom Action Ribbon */}
                 <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-amber-500/20">
-                  {/* Deep Dive with BharatGPT */}
+                  {/* Deep Dive with Prajna BharatGPT */}
                   {onAskAboutEvent && (
                     <button
                       onClick={() =>
@@ -573,7 +636,7 @@ export const TodayInHistoryCard: React.FC<TodayInHistoryCardProps> = ({
                       className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 shadow-lg shadow-amber-950/50 transition-all"
                     >
                       <MessageSquare className="w-4 h-4" />
-                      <span>Deep Dive with BharatGPT</span>
+                      <span>Deep Dive with Prajna BharatGPT</span>
                     </button>
                   )}
 

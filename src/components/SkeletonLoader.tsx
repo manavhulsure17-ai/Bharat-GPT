@@ -18,7 +18,7 @@ export const ChatResponseSkeleton: React.FC<{
   mode?: string;
   personaName?: string;
   personaAvatar?: string;
-}> = ({ mode = "balanced", personaName = "Bharat GPT Scholar", personaAvatar = "🕉️" }) => {
+}> = ({ mode = "balanced", personaName = "Prajna BharatGPT Scholar", personaAvatar = "🕉️" }) => {
   return (
     <div className="flex gap-3 items-start animate-fadeIn w-full">
       {/* Avatar */}

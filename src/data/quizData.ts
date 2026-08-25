@@ -1,4 +1,5 @@
 import { QuizQuestion, UserBadge } from "../types";
+import { MASTER_BADGES } from "./karmaBadgesData";
 
 export const CURATED_QUIZ_QUESTIONS: QuizQuestion[] = [
   {
@@ -80,54 +81,4 @@ export const CURATED_QUIZ_QUESTIONS: QuizQuestion[] = [
   }
 ];
 
-export const INITIAL_USER_BADGES: UserBadge[] = [
-  {
-    id: "vidya-jigyasu",
-    name: "Vidya Jigyasu",
-    indicName: "विद्या जिज्ञासु",
-    icon: "📜",
-    description: "Begun the journey of Indic wisdom & heritage exploration.",
-    unlocked: true,
-    unlockedAt: "First Step",
-  },
-  {
-    id: "itihaas-marmagya",
-    name: "Itihaas Marmagya",
-    indicName: "इतिहास मर्मज्ञ",
-    icon: "🏛️",
-    description: "Score 100% on any heritage or dynasty challenge.",
-    unlocked: false,
-  },
-  {
-    id: "katha-shilpi",
-    name: "Katha Shilpi",
-    indicName: "कथा शिल्पी",
-    icon: "🎭",
-    description: "Complete an interactive multi-scene Katha story.",
-    unlocked: false,
-  },
-  {
-    id: "gita-sadhak",
-    name: "Gita Sadhak",
-    indicName: "गीता साधक",
-    icon: "🕉️",
-    description: "Explore and reflect on 3 or more sacred Sanskrit shlokas.",
-    unlocked: false,
-  },
-  {
-    id: "bhasha-sangam",
-    name: "Bhasha Ratna",
-    indicName: "भाषा रत्न",
-    icon: "🗣️",
-    description: "Translate or converse across 3 distinct Indic languages.",
-    unlocked: false,
-  },
-  {
-    id: "bharat-acharya",
-    name: "Bharat Acharya",
-    indicName: "भारत आचार्य",
-    icon: "👑",
-    description: "Master of all five heritage disciplines.",
-    unlocked: false,
-  }
-];
+export const INITIAL_USER_BADGES: UserBadge[] = MASTER_BADGES;

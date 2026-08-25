@@ -131,3 +131,82 @@ body.theme-temple-ivory .shimmer-mask::after {
     transparent 100%
   );
 }
+
+@keyframes slideInRight {
+  0% {
+    opacity: 0;
+    transform: translateX(30px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.animate-slideInRight {
+  animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slideUpFade {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.animate-slideUpFade {
+  animation: slideUpFade 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* =========================================================
+   Interactive Golden Highlight & Underline Effect for Gita & Storyteller
+   ========================================================= */
+
+/* Selection highlighting inside Gita Wisdom and Storyteller sections */
+.golden-selection-zone ::selection,
+.golden-selection-zone *::selection {
+  background-color: rgba(245, 158, 11, 0.32);
+  color: #fffbeb;
+  text-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+  text-decoration: underline;
+  text-decoration-color: #f59e0b;
+  text-decoration-thickness: 2.5px;
+  text-underline-offset: 4px;
+}
+
+body.theme-temple-ivory .golden-selection-zone ::selection,
+body.theme-temple-ivory .golden-selection-zone *::selection {
+  background-color: rgba(217, 119, 6, 0.28);
+  color: #451a03;
+  text-shadow: 0 0 6px rgba(217, 119, 6, 0.4);
+  text-decoration: underline;
+  text-decoration-color: #d97706;
+  text-decoration-thickness: 2.5px;
+  text-underline-offset: 4px;
+}
+
+/* Dynamic Golden Underline Shimmer Animation for hovered or selected verses */
+@keyframes goldenUnderlineSweep {
+  0% {
+    background-size: 0% 2.5px;
+    background-position: left bottom;
+  }
+  100% {
+    background-size: 100% 2.5px;
+    background-position: left bottom;
+  }
+}
+
+.golden-underline-glow {
+  background-image: linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b);
+  background-repeat: no-repeat;
+  background-size: 100% 2.5px;
+  background-position: left bottom;
+  padding-bottom: 2px;
+  animation: goldenUnderlineSweep 0.4s ease-out;
+}
+

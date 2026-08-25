@@ -1,5 +1,5 @@
 {
-  "name": "BharatGPT - Indic AI & Heritage Platform",
+  "name": "Prajna BharatGPT - Indic AI & Heritage Platform",
   "description": "An Indic AI platform celebrating Indian heritage, Vedic wisdom, multilingual dialogue, interactive storytelling, and cultural exploration.",
   "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

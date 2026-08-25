@@ -1,9 +1,9 @@
 import JSZip from "jszip";
 import { ZERO_TO_HERO_MASTER_GUIDE } from "../data/masterGuideData";
 
-export const STEP_BY_STEP_VS_CODE_TUTORIAL = `# BHARAT GPT: STEP-BY-STEP VS CODE SETUP & MODULE CONNECTION GUIDE
+export const STEP_BY_STEP_VS_CODE_TUTORIAL = `# PRAJNA BHARAT GPT: STEP-BY-STEP VS CODE SETUP & MODULE CONNECTION GUIDE
 
-This document explains **how every single module in Bharat GPT connects to the next**, and **how to open, modify, and customize the code in VS Code**.
+This document explains **how every single module in Prajna BharatGPT connects to the next**, and **how to open, modify, and customize the code in VS Code**.
 
 ---
 
@@ -178,7 +178,7 @@ export async function generateFullProjectZip(): Promise<Blob> {
   moduleGuides?.file("01_LOGIN_PAGE_AND_AUTH_GATE.md", `# MODULE 1: LOGIN PAGE & AUTHENTICATION GATE
 
 ## Purpose
-Enforces secure login before any user can view or use the Bharat GPT features.
+Enforces secure login before any user can view or use the Prajna BharatGPT features.
 
 ## Source Code Location:
 - UI Component: \`src/components/LoginPage.tsx\`
@@ -199,7 +199,7 @@ if (!currentUser) {
 - Temple Bell audio feedback upon authentication
 `);
 
-  moduleGuides?.file("02_BHARAT_AI_CHAT_ENGINE.md", `# MODULE 2: BHARAT AI CHAT ENGINE & PERSONAS
+  moduleGuides?.file("02_BHARAT_AI_CHAT_ENGINE.md", `# MODULE 2: PRAJNA BHARAT AI CHAT ENGINE & PERSONAS
 
 ## Purpose
 Conversational civilizational intelligence with 5 custom personas.

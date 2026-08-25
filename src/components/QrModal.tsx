@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   X
 } from "lucide-react";
+import { toast } from "../services/toastService";
 
 interface QrModalProps {
   isOpen: boolean;
@@ -39,6 +40,7 @@ export const QrModal: React.FC<QrModalProps> = ({ isOpen, onClose, theme = "deep
   const handleCopyLink = (url: string) => {
     navigator.clipboard.writeText(url);
     setCopied(true);
+    toast.success("Portal URL copied to clipboard!", { title: "Copied Link" });
     setTimeout(() => setCopied(false), 2500);
   };
 
@@ -64,10 +66,11 @@ export const QrModal: React.FC<QrModalProps> = ({ isOpen, onClose, theme = "deep
         const pngUrl = canvas.toDataURL("image/png");
         const downloadLink = document.createElement("a");
         downloadLink.href = pngUrl;
-        downloadLink.download = "Bharat-GPT-Scan-QR.png";
+        downloadLink.download = "Prajna-BharatGPT-Scan-QR.png";
         document.body.appendChild(downloadLink);
         downloadLink.click();
         document.body.removeChild(downloadLink);
+        toast.success("QR Code image downloaded successfully!", { title: "QR Code" });
       }
     };
 
@@ -107,7 +110,7 @@ export const QrModal: React.FC<QrModalProps> = ({ isOpen, onClose, theme = "deep
             <QrCode className="w-6 h-6 text-amber-500" />
           </div>
           <h2 className={`font-royal text-xl sm:text-2xl font-bold ${isLight ? "text-amber-900" : "text-saffron-gradient"}`}>
-            Scan to Open Bharat GPT
+            Scan to Open Prajna BharatGPT
           </h2>
           <p className={`text-xs sm:text-sm ${isLight ? "text-stone-600" : "text-amber-300/80"}`}>
             Point your smartphone camera or Google Lens to instantly launch the login / sign-in screen.
@@ -218,7 +221,7 @@ export const QrModal: React.FC<QrModalProps> = ({ isOpen, onClose, theme = "deep
           <ol className={`list-decimal list-inside space-y-1 text-[11px] ${isLight ? "text-stone-600" : "text-amber-300/70"}`}>
             <li>Open your phone's <strong>Camera</strong> or <strong>Google Lens</strong> app.</li>
             <li>Focus the camera on the QR code square above.</li>
-            <li>Tap the link notification that appears to instantly open the <strong>Bharat GPT Login & Portal</strong>.</li>
+            <li>Tap the link notification that appears to instantly open the <strong>Prajna BharatGPT Login & Portal</strong>.</li>
           </ol>
         </div>
       </div>

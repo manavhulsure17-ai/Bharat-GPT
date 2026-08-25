@@ -26,15 +26,23 @@ import { IndicLanguageCode, SavedItem, StoryChoice, StoryScene } from "../types"
 import { generateStoryScene } from "../services/geminiService";
 import { soundscape } from "../services/audioSynth";
 import { StorySceneSkeleton, Skeleton } from "./SkeletonLoader";
+import { karmaService } from "../services/karmaService";
+import { InteractiveTextHighlight } from "./InteractiveTextHighlight";
 
 interface StorytellerSectionProps {
   selectedLanguage: IndicLanguageCode;
   onSaveItem: (item: SavedItem) => void;
+  initialPrompt?: string | null;
+  initialTheme?: string | null;
+  onClearInitialPrompt?: () => void;
 }
 
 export const StorytellerSection: React.FC<StorytellerSectionProps> = ({
   selectedLanguage,
   onSaveItem,
+  initialPrompt,
+  initialTheme,
+  onClearInitialPrompt,
 }) => {
   const [selectedTheme, setSelectedTheme] = useState("epics");
   const [customPrompt, setCustomPrompt] = useState("");
@@ -51,6 +59,20 @@ export const StorytellerSection: React.FC<StorytellerSectionProps> = ({
   const [isTanpuraAmbienceOn, setIsTanpuraAmbienceOn] = useState(false);
   const [autoNarrateNextScene, setAutoNarrateNextScene] = useState(false);
   const [chunkProgress, setChunkProgress] = useState<{ current: number; total: number }>({ current: 0, total: 1 });
+
+  // Handle incoming initial prompt from search navigation
+  useEffect(() => {
+    if (initialPrompt) {
+      setCustomPrompt(initialPrompt);
+      if (initialTheme) {
+        setSelectedTheme(initialTheme);
+      }
+      handleStartStory(initialPrompt);
+      if (onClearInitialPrompt) {
+        onClearInitialPrompt();
+      }
+    }
+  }, [initialPrompt, initialTheme]);
 
   // Synchronize speech state
   useEffect(() => {
@@ -117,6 +139,9 @@ export const StorytellerSection: React.FC<StorytellerSectionProps> = ({
 
       setCurrentScene(scene);
       setStoryHistory([scene]);
+
+      karmaService.addKarma(25, `Katha Chapter • ${scene.title}`, "story");
+      karmaService.recordActivity("storiesCompleted", 1);
 
       // Auto-narrate if enabled
       if (autoNarrateNextScene && scene) {
@@ -254,7 +279,10 @@ export const StorytellerSection: React.FC<StorytellerSectionProps> = ({
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-8">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-8 golden-selection-zone relative">
+      {/* Interactive Golden Highlight Tooltip on text selection */}
+      <InteractiveTextHighlight sectionName="Katha Storyteller" />
+
       {/* Title & Introduction */}
       <div className="text-center space-y-2 max-w-2xl mx-auto">
         <div className="inline-flex items-center gap-2 bg-orange-500/10 border border-orange-500/30 px-3 py-1 rounded-full text-xs text-orange-300">

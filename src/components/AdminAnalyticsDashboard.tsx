@@ -367,7 +367,7 @@ export const AdminAnalyticsDashboard: React.FC<AdminAnalyticsDashboardProps> = (
               <span>Language Preference Breakdown</span>
             </h3>
             <p className="text-xs text-amber-300/70">
-              Linguistic adoption across Bharat GPT interactions.
+              Linguistic adoption across Prajna BharatGPT interactions.
             </p>
           </div>
 

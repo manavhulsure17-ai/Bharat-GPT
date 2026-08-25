@@ -19,6 +19,7 @@ import { QuizQuestion, UserBadge } from "../types";
 import { fetchDynamicQuiz } from "../services/geminiService";
 import { soundscape } from "../services/audioSynth";
 import { QuizSkeleton } from "./SkeletonLoader";
+import { karmaService } from "../services/karmaService";
 
 interface QuizSectionProps {
   onUnlockBadge?: (badgeId: string) => void;
@@ -31,7 +32,7 @@ export const QuizSection: React.FC<QuizSectionProps> = () => {
   const [isAnswered, setIsAnswered] = useState(false);
   const [score, setScore] = useState(0);
   const [streak, setStreak] = useState(0);
-  const [badges, setBadges] = useState<UserBadge[]>(INITIAL_USER_BADGES);
+  const [badges, setBadges] = useState<UserBadge[]>(() => karmaService.getProfile().badges);
   const [isQuizCompleted, setIsQuizCompleted] = useState(false);
   const [isGeneratingAiQuiz, setIsGeneratingAiQuiz] = useState(false);
 
@@ -50,9 +51,12 @@ export const QuizSection: React.FC<QuizSectionProps> = () => {
       setStreak(newStreak);
       soundscape.playTempleBell();
 
+      karmaService.addKarma(15, `Quiz Correct • ${currentQ.category || "Heritage"}`, "quiz");
+
       // Check badge unlock for perfect score
       if (newStreak >= 3) {
-        unlockBadge("itihaas-marmagya");
+        karmaService.unlockBadge("itihaas-marmagya");
+        setBadges(karmaService.getProfile().badges);
       }
     } else {
       setStreak(0);
@@ -60,11 +64,8 @@ export const QuizSection: React.FC<QuizSectionProps> = () => {
   };
 
   const unlockBadge = (id: string) => {
-    setBadges((prev) =>
-      prev.map((b) =>
-        b.id === id ? { ...b, unlocked: true, unlockedAt: new Date().toLocaleDateString() } : b
-      )
-    );
+    karmaService.unlockBadge(id);
+    setBadges(karmaService.getProfile().badges);
   };
 
   const handleNextQuestion = () => {
@@ -81,6 +82,9 @@ export const QuizSection: React.FC<QuizSectionProps> = () => {
         colors: ["#f59e0b", "#ea580c", "#ef4444", "#3b82f6", "#10b981"],
       });
       soundscape.playTempleBell();
+      karmaService.addKarma(40, `Gyan Pariksha Completed • ${score + 1}/${questions.length} Correct`, "quiz");
+      karmaService.recordActivity("quizzesCompleted", 1);
+      setBadges(karmaService.getProfile().badges);
     }
   };
 

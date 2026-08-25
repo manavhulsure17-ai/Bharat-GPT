@@ -15,6 +15,7 @@ import { IndicLanguageCode } from "../types";
 import { translateIndicText } from "../services/geminiService";
 import { soundscape } from "../services/audioSynth";
 import { TranslationSkeleton } from "./SkeletonLoader";
+import { toast } from "../services/toastService";
 
 export const TranslateStudio: React.FC = () => {
   const [sourceLanguage, setSourceLanguage] = useState<IndicLanguageCode>("English");
@@ -42,8 +43,10 @@ export const TranslateStudio: React.FC = () => {
     try {
       const data = await translateIndicText(text, targetLanguage, sourceLanguage);
       setTranslatedResult(data);
+      toast.success("Translation completed!", { title: "Bhasha Sangam" });
     } catch (e) {
       console.error(e);
+      toast.error("Failed to translate text. Please check connection.", { title: "Translation Error" });
     } finally {
       setIsLoading(false);
     }
@@ -53,6 +56,7 @@ export const TranslateStudio: React.FC = () => {
     const temp = sourceLanguage;
     setSourceLanguage(targetLanguage);
     setTargetLanguage(temp);
+    toast.language(`Swapped languages: ${targetLanguage} ⇄ ${temp}`);
   };
 
   const handleSpeak = (text: string) => {
@@ -62,6 +66,7 @@ export const TranslateStudio: React.FC = () => {
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
     setCopied(true);
+    toast.success("Translation copied to clipboard!", { title: "Copied" });
     setTimeout(() => setCopied(false), 2000);
   };
 

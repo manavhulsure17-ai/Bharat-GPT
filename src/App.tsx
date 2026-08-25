@@ -10,12 +10,20 @@ import { SavedVaultSection } from "./components/SavedVaultSection";
 import { AdminPanel } from "./components/AdminPanel";
 import { LoginPage } from "./components/LoginPage";
 import { DeploymentModal } from "./components/DeploymentModal";
+import { GlobalSearchModal } from "./components/GlobalSearchModal";
+import { KarmaBadgeModal } from "./components/KarmaBadgeModal";
 import { Footer } from "./components/Footer";
 import { VedicWisdomWidget } from "./components/VedicWisdomWidget";
 import { TodayInHistoryCard } from "./components/TodayInHistoryCard";
-import { IndicLanguageCode, NavigationTab, SavedItem, AppUser, AppTheme } from "./types";
+import { IndicLanguageCode, NavigationTab, SavedItem, AppUser, AppTheme, UserKarmaProfile } from "./types";
+import { SearchResultItem } from "./services/searchService";
 import { soundscape } from "./services/audioSynth";
 import { TabSectionSkeleton } from "./components/SkeletonLoader";
+import { SacredParticlesBackground } from "./components/SacredParticlesBackground";
+import { ToastContainer } from "./components/ToastContainer";
+import { toast } from "./services/toastService";
+import { karmaService } from "./services/karmaService";
+import { INDIC_LANGUAGES } from "./data/configData";
 import {
   getCurrentUser,
   logoutUser,
@@ -26,6 +34,7 @@ import {
 export default function App() {
   const [currentUser, setCurrentUser] = useState<AppUser | null>(() => getCurrentUser());
   const [activeTab, setActiveTab] = useState<NavigationTab>("chat");
+  const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
   const [theme, setTheme] = useState<AppTheme>(() => {
     try {
       const savedTheme = localStorage.getItem("bharat_gpt_theme") as AppTheme;
@@ -37,9 +46,35 @@ export default function App() {
   const [selectedLanguage, setSelectedLanguage] = useState<IndicLanguageCode>(() => {
     return getSavedLanguagePreference();
   });
-  const [isAudioDronePlaying, setIsAudioDronePlaying] = useState(false);
+  const [isAudioDronePlaying, setIsAudioDronePlaying] = useState(() => soundscape.isAnySoundscapeActive());
   const [isDeployModalOpen, setIsDeployModalOpen] = useState(false);
+  const [isKarmaModalOpen, setIsKarmaModalOpen] = useState(false);
+  const [karmaProfile, setKarmaProfile] = useState<UserKarmaProfile>(() => karmaService.getProfile());
   const [prefilledChatPrompt, setPrefilledChatPrompt] = useState<string>("");
+
+  // Subscribe to Karma and Soundscape audio updates
+  useEffect(() => {
+    const unsubscribeKarma = karmaService.subscribe((profile) => {
+      setKarmaProfile(profile);
+    });
+    const unsubscribeSoundscape = soundscape.subscribeSoundscape((state) => {
+      setIsAudioDronePlaying(state.isTanpuraPlaying || state.isNaturePlaying);
+    });
+    // Check daily streak and login bonus
+    karmaService.checkDailyDarshan();
+    return () => {
+      unsubscribeKarma();
+      unsubscribeSoundscape();
+    };
+  }, []);
+  
+  // Search Target Navigation States
+  const [selectedGitaChapterNumber, setSelectedGitaChapterNumber] = useState<number | null>(null);
+  const [selectedGitaShlokaId, setSelectedGitaShlokaId] = useState<string | null>(null);
+  const [initialStoryPrompt, setInitialStoryPrompt] = useState<string | null>(null);
+  const [initialStoryTheme, setInitialStoryTheme] = useState<string | null>(null);
+  const [initialHeritageId, setInitialHeritageId] = useState<string | null>(null);
+
   const [savedItems, setSavedItems] = useState<SavedItem[]>(() => {
     try {
       const saved = localStorage.getItem("bharat_gpt_vault");
@@ -48,6 +83,29 @@ export default function App() {
       return [];
     }
   });
+
+  // Global Keyboard Shortcut listener for Quick Search (Cmd+K / Ctrl+K or /)
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Check if user is typing in an input or textarea
+      const target = e.target as HTMLElement;
+      const isInput =
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable;
+
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setIsGlobalSearchOpen((prev) => !prev);
+      } else if (e.key === "/" && !isInput) {
+        e.preventDefault();
+        setIsGlobalSearchOpen(true);
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, []);
 
   // Sync theme class with body element
   useEffect(() => {
@@ -64,7 +122,15 @@ export default function App() {
   }, [theme]);
 
   const handleToggleTheme = () => {
-    setTheme((prev) => (prev === "deep_night" ? "temple_ivory" : "deep_night"));
+    setTheme((prev) => {
+      const nextTheme = prev === "deep_night" ? "temple_ivory" : "deep_night";
+      toast.theme(
+        nextTheme === "temple_ivory"
+          ? "Switched to Temple Ivory (Day Mode)"
+          : "Switched to Deep Night (Vedic Dark Mode)"
+      );
+      return nextTheme;
+    });
   };
 
   // Sync language changes to user profile database and localStorage
@@ -74,6 +140,13 @@ export default function App() {
     if (updatedUser && currentUser) {
       setCurrentUser(updatedUser);
     }
+    const langObj = INDIC_LANGUAGES.find((l) => l.code === newLang);
+    toast.language(
+      `Language set to ${langObj?.native || newLang} (${langObj?.label || newLang})`,
+      {
+        icon: "🌐",
+      }
+    );
   };
 
   useEffect(() => {
@@ -85,19 +158,58 @@ export default function App() {
   }, [savedItems]);
 
   const handleToggleDroneAudio = () => {
-    const isPlaying = soundscape.toggleDrone();
-    setIsAudioDronePlaying(isPlaying);
+    if (soundscape.isAnySoundscapeActive()) {
+      soundscape.setSoundscapePreset("off");
+      toast.audio("Ambient soundscapes paused", {
+        title: "Soundscapes • Off",
+      });
+    } else {
+      soundscape.setSoundscapePreset("both");
+      toast.audio("Ashram Harmony activated (Tanpura + Zen Nature stream & birds)", {
+        title: "Ashram Harmony • On",
+        icon: "🪷",
+      });
+    }
   };
 
   const handleSaveItem = (item: SavedItem) => {
     setSavedItems((prev) => {
-      if (prev.some((i) => i.id === item.id)) return prev;
+      if (prev.some((i) => i.id === item.id)) {
+        toast.info(`"${item.title.substring(0, 32)}${item.title.length > 32 ? '...' : ''}" is already in your Smriti Vault.`, {
+          title: "Already Saved",
+        });
+        return prev;
+      }
+      soundscape.playTempleBell();
+      karmaService.addKarma(15, `Saved to Vault • ${item.title.substring(0, 24)}`, "vault");
+      toast.vault(
+        `Added "${item.title.substring(0, 34)}${item.title.length > 34 ? '...' : ''}" to your personal Smriti Vault.`,
+        {
+          title: "Added to Vault",
+          action: {
+            label: "View Vault",
+            onClick: () => {
+              setActiveTab("vault");
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            },
+          },
+        }
+      );
       return [item, ...prev];
     });
   };
 
   const handleRemoveSavedItem = (id: string) => {
+    const itemToRemove = savedItems.find((i) => i.id === id);
     setSavedItems((prev) => prev.filter((i) => i.id !== id));
+    toast.info(
+      itemToRemove
+        ? `Removed "${itemToRemove.title.substring(0, 30)}${itemToRemove.title.length > 30 ? '...' : ''}" from Vault.`
+        : "Item removed from Vault.",
+      {
+        title: "Vault Updated",
+      }
+    );
   };
 
   const handleAskBharatGPTFromExplorer = (prompt: string) => {
@@ -106,25 +218,56 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const handleNavigateSearchResult = (result: SearchResultItem) => {
+    if (result.domain === "gita") {
+      if (result.targetPayload?.chapterNumber) {
+        setSelectedGitaChapterNumber(result.targetPayload.chapterNumber);
+      }
+      if (result.targetPayload?.shlokaId) {
+        setSelectedGitaShlokaId(result.targetPayload.shlokaId);
+      }
+      setActiveTab("gita");
+    } else if (result.domain === "story") {
+      if (result.targetPayload?.storyPrompt) {
+        setInitialStoryPrompt(result.targetPayload.storyPrompt);
+        setInitialStoryTheme(result.targetPayload.storyTheme || "epics");
+      }
+      setActiveTab("story");
+    } else if (result.domain === "history") {
+      if (result.targetPayload?.heritageId) {
+        setInitialHeritageId(result.targetPayload.heritageId);
+      }
+      setActiveTab("explorer");
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const handleLogout = () => {
     logoutUser();
     setCurrentUser(null);
     setActiveTab("chat");
+    toast.info("You have signed out successfully.", { title: "Signed Out" });
   };
 
   // If not logged in, display the sacred Authentication Gate
   if (!currentUser) {
     return (
-      <LoginPage
-        onLoginSuccess={(user) => {
-          setCurrentUser(user);
-          if (user.preferredLanguage) {
-            setSelectedLanguage(user.preferredLanguage);
-          }
-        }}
-        theme={theme}
-        onToggleTheme={handleToggleTheme}
-      />
+      <>
+        <ToastContainer theme={theme} />
+        <LoginPage
+          onLoginSuccess={(user) => {
+            setCurrentUser(user);
+            if (user.preferredLanguage) {
+              setSelectedLanguage(user.preferredLanguage);
+            }
+            toast.success(`Welcome back, ${user.name}! 🙏`, {
+              title: "Prajna BharatGPT",
+            });
+          }}
+          theme={theme}
+          onToggleTheme={handleToggleTheme}
+        />
+      </>
     );
   }
 
@@ -132,11 +275,17 @@ export default function App() {
 
   return (
     <div
-      className={`min-h-screen flex flex-col font-sans selection:bg-amber-500 selection:text-slate-950 transition-colors ${
+      className={`min-h-screen flex flex-col font-sans selection:bg-amber-500 selection:text-slate-950 transition-colors relative ${
         isLight ? "bg-[#faf7f2] text-stone-900" : "bg-[#070b14] text-amber-100"
       }`}
     >
-      {/* Top Header */}
+      {/* Toast Notification Container */}
+      <ToastContainer theme={theme} />
+
+      {/* Subtle Interactive Sacred Background Particles (Om & Lotus) */}
+      <SacredParticlesBackground theme={theme} />
+
+      {/* Top Header with Global Search */}
       <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -146,6 +295,9 @@ export default function App() {
         onToggleAudio={handleToggleDroneAudio}
         savedCount={savedItems.length}
         onOpenDeployGuide={() => setIsDeployModalOpen(true)}
+        onOpenSearch={() => setIsGlobalSearchOpen(true)}
+        onOpenKarmaModal={() => setIsKarmaModalOpen(true)}
+        karmaProfile={karmaProfile}
         currentUser={currentUser}
         onLogout={handleLogout}
         theme={theme}
@@ -183,6 +335,8 @@ export default function App() {
           <ExplorerSection
             onAskBharatGPT={handleAskBharatGPTFromExplorer}
             onSaveItem={handleSaveItem}
+            initialHeritageId={initialHeritageId}
+            onClearInitialHeritage={() => setInitialHeritageId(null)}
           />
         )}
 
@@ -190,6 +344,12 @@ export default function App() {
           <StorytellerSection
             selectedLanguage={selectedLanguage}
             onSaveItem={handleSaveItem}
+            initialPrompt={initialStoryPrompt}
+            initialTheme={initialStoryTheme}
+            onClearInitialPrompt={() => {
+              setInitialStoryPrompt(null);
+              setInitialStoryTheme(null);
+            }}
           />
         )}
 
@@ -197,6 +357,12 @@ export default function App() {
           <GitaWisdomSection
             selectedLanguage={selectedLanguage}
             onSaveItem={handleSaveItem}
+            initialChapterNumber={selectedGitaChapterNumber}
+            initialShlokaId={selectedGitaShlokaId}
+            onClearInitialSelection={() => {
+              setSelectedGitaChapterNumber(null);
+              setSelectedGitaShlokaId(null);
+            }}
           />
         )}
 
@@ -223,10 +389,27 @@ export default function App() {
         )}
       </main>
 
+      {/* Global Search Modal across Gita, Stories, History */}
+      <GlobalSearchModal
+        isOpen={isGlobalSearchOpen}
+        onClose={() => setIsGlobalSearchOpen(false)}
+        onNavigateToResult={handleNavigateSearchResult}
+        onAskBharatGPT={handleAskBharatGPTFromExplorer}
+        onSaveItem={handleSaveItem}
+        theme={theme}
+      />
+
       {/* Deployment & Setup Modal */}
       <DeploymentModal
         isOpen={isDeployModalOpen}
         onClose={() => setIsDeployModalOpen(false)}
+      />
+
+      {/* Karma Points & Indic Badges Dashboard Modal */}
+      <KarmaBadgeModal
+        isOpen={isKarmaModalOpen}
+        onClose={() => setIsKarmaModalOpen(false)}
+        theme={theme}
       />
 
       {/* Footer */}

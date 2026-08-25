@@ -17,6 +17,7 @@ import {
 import { SavedItem } from "../types";
 import { soundscape } from "../services/audioSynth";
 import { exportVaultToPDF, exportSingleItemToPDF } from "../services/pdfExportService";
+import { toast } from "../services/toastService";
 
 interface SavedVaultSectionProps {
   savedItems: SavedItem[];
@@ -39,6 +40,7 @@ export const SavedVaultSection: React.FC<SavedVaultSectionProps> = ({
   const triggerFeedback = (msg: string) => {
     soundscape.playTempleBell();
     setExportSuccessMsg(msg);
+    toast.success(msg, { title: "Vault Export" });
     setTimeout(() => {
       setExportSuccessMsg(null);
     }, 3500);

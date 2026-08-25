@@ -239,3 +239,92 @@ export interface AdminCredentials {
 
 export type AppTheme = "deep_night" | "temple_ivory";
 
+export type ToastType =
+  | "success"
+  | "info"
+  | "vault"
+  | "language"
+  | "theme"
+  | "audio"
+  | "karma"
+  | "warning"
+  | "error";
+
+export interface KarmaLevel {
+  level: number;
+  title: string;
+  indicTitle: string;
+  minPoints: number;
+  maxPoints: number;
+  color: string;
+  icon: string;
+  description: string;
+}
+
+export type KarmaCategory =
+  | "gita"
+  | "wisdom"
+  | "heritage"
+  | "explorer"
+  | "story"
+  | "quiz"
+  | "translate"
+  | "vault"
+  | "dialogue"
+  | "streak"
+  | "general";
+
+export interface KarmaLogItem {
+  id: string;
+  activity: string;
+  points: number;
+  timestamp: string;
+  category: KarmaCategory;
+}
+
+export interface UserBadge {
+  id: string;
+  name: string;
+  indicName: string;
+  icon: string;
+  category: "wisdom" | "gita" | "heritage" | "language" | "mastery" | "community";
+  description: string;
+  criteria: string;
+  unlocked: boolean;
+  unlockedAt?: string;
+  rarity?: "Common" | "Sacred" | "Divine" | "Legendary";
+}
+
+export interface UserKarmaProfile {
+  totalPoints: number;
+  currentLevel: number;
+  streakDays: number;
+  lastActiveDate: string;
+  dailyBonusClaimedDate?: string;
+  badges: UserBadge[];
+  history: KarmaLogItem[];
+  stats: {
+    gitaVersesRead: number;
+    gitaChaptersExplored: number;
+    dailyWisdomReadCount: number;
+    heritageTopicsExplored: number;
+    storiesCompleted: number;
+    quizzesCompleted: number;
+    translationsDone: number;
+    vaultItemsSaved: number;
+  };
+}
+
+export interface ToastNotification {
+  id: string;
+  title?: string;
+  message: string;
+  type?: ToastType;
+  duration?: number;
+  icon?: string;
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
+}
+

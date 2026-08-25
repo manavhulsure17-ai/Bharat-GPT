@@ -1,25 +1,76 @@
 // Web Audio API authentic Indian soundscapes & Web Speech Synthesis
 
-export type SpeechStateListener = (state: {
+export interface SpeechState {
   isSpeaking: boolean;
+  isPaused: boolean;
   speakingId: string | null;
   activeLanguage: string;
-}) => void;
+  currentChunk: number;
+  totalChunks: number;
+  progressPercent: number;
+  currentTextSnippet?: string;
+  playbackRate: number;
+}
+
+export type SpeechStateListener = (state: SpeechState) => void;
+
+export interface SoundscapeState {
+  isTanpuraPlaying: boolean;
+  isNaturePlaying: boolean;
+  tanpuraVolume: number;
+  natureVolume: number;
+}
+
+export type SoundscapeListener = (state: SoundscapeState) => void;
+
+export interface TTSOptions {
+  rate?: number;
+  pitch?: number;
+  volume?: number;
+  voiceName?: string;
+  enableAmbientDrone?: boolean;
+  onChunkProgress?: (chunkIndex: number, totalChunks: number, chunkText: string) => void;
+  onStart?: () => void;
+  onEnd?: () => void;
+}
 
 class IndianSoundscapeService {
   private ctx: AudioContext | null = null;
+  
+  // Tanpura state
   private isTanpuraPlaying = false;
   private tanpuraInterval: any = null;
   private tanpuraGain: GainNode | null = null;
+  private tanpuraVolumeLevel = 0.3;
+
+  // Zen Nature state (River stream, forest wind, Himalayan birdsong)
+  private isNaturePlaying = false;
+  private natureGain: GainNode | null = null;
+  private natureStreamGain: GainNode | null = null;
+  private natureWindGain: GainNode | null = null;
+  private natureBirdGain: GainNode | null = null;
+  private streamNoiseNode: AudioBufferSourceNode | null = null;
+  private windNoiseNode: AudioBufferSourceNode | null = null;
+  private streamLfo: OscillatorNode | null = null;
+  private windLfo: OscillatorNode | null = null;
+  private natureBirdTimer: any = null;
+  private natureVolumeLevel = 0.28;
+
+  // Soundscape listeners
+  private soundscapeListeners: Set<SoundscapeListener> = new Set();
 
   // Speech synthesis state
   private availableVoices: SpeechSynthesisVoice[] = [];
   private currentSpeakingId: string | null = null;
   private isSpeechActive = false;
+  private isSpeechPaused = false;
   private speechUtteranceQueue: SpeechSynthesisUtterance[] = [];
+  private speechChunksRaw: string[] = [];
   private currentUtteranceIndex = 0;
+  private currentPlaybackRate = 0.95;
   private speechKeepAliveInterval: any = null;
   private listeners: Set<SpeechStateListener> = new Set();
+  private autoAmbientDroneEnabled = false;
 
   constructor() {
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
@@ -36,13 +87,49 @@ class IndianSoundscapeService {
     }
   }
 
+  public subscribeSoundscape(listener: SoundscapeListener): () => void {
+    this.soundscapeListeners.add(listener);
+    listener(this.getSoundscapeState());
+    return () => {
+      this.soundscapeListeners.delete(listener);
+    };
+  }
+
+  public getSoundscapeState(): SoundscapeState {
+    return {
+      isTanpuraPlaying: this.isTanpuraPlaying,
+      isNaturePlaying: this.isNaturePlaying,
+      tanpuraVolume: this.tanpuraVolumeLevel,
+      natureVolume: this.natureVolumeLevel,
+    };
+  }
+
+  private notifySoundscape() {
+    const state = this.getSoundscapeState();
+    this.soundscapeListeners.forEach((fn) => {
+      try {
+        fn(state);
+      } catch (e) {
+        console.error("Soundscape listener error:", e);
+      }
+    });
+  }
+
   public subscribe(listener: SpeechStateListener): () => void {
     this.listeners.add(listener);
     // Initial notification
     listener({
       isSpeaking: this.isSpeechActive,
+      isPaused: this.isSpeechPaused,
       speakingId: this.currentSpeakingId,
       activeLanguage: "English",
+      currentChunk: this.currentUtteranceIndex,
+      totalChunks: Math.max(1, this.speechUtteranceQueue.length),
+      progressPercent:
+        this.speechUtteranceQueue.length > 0
+          ? Math.round((this.currentUtteranceIndex / this.speechUtteranceQueue.length) * 100)
+          : 0,
+      playbackRate: this.currentPlaybackRate,
     });
     return () => {
       this.listeners.delete(listener);
@@ -50,11 +137,23 @@ class IndianSoundscapeService {
   }
 
   private notifyState(lang: string = "English") {
-    const state = {
+    const total = Math.max(1, this.speechUtteranceQueue.length);
+    const curr = this.currentUtteranceIndex;
+    const progress = total > 0 ? Math.min(100, Math.round((curr / total) * 100)) : 0;
+    const snippet = this.speechChunksRaw[curr] || "";
+
+    const state: SpeechState = {
       isSpeaking: this.isSpeechActive,
+      isPaused: this.isSpeechPaused,
       speakingId: this.currentSpeakingId,
       activeLanguage: lang,
+      currentChunk: curr,
+      totalChunks: total,
+      progressPercent: progress,
+      currentTextSnippet: snippet,
+      playbackRate: this.currentPlaybackRate,
     };
+
     this.listeners.forEach((listener) => {
       try {
         listener(state);
@@ -121,9 +220,172 @@ class IndianSoundscapeService {
     oscHarmonic2.stop(time + duration);
   }
 
-  // Starts authentic 4-string Tanpura loop: Pa (G#3 ~207Hz), Sa (C#4 ~277Hz), Sa (C#4 ~277Hz), Kharja Sa (C#3 ~138Hz)
-  public toggleTanpura(onState?: boolean): boolean {
+  // Generates organic noise buffers for natural water stream and forest wind
+  private createNoiseBuffer(type: "pink" | "brown" = "pink", durationSec: number = 5): AudioBuffer {
     const ctx = this.getAudioContext();
+    const bufferSize = Math.floor(ctx.sampleRate * durationSec);
+    const noiseBuffer = ctx.createBuffer(2, bufferSize, ctx.sampleRate);
+    const left = noiseBuffer.getChannelData(0);
+    const right = noiseBuffer.getChannelData(1);
+
+    if (type === "pink") {
+      // Paul Kellet's filter algorithm for true 1/f pink noise (warm organic water/wind sound)
+      let b0L = 0, b1L = 0, b2L = 0, b3L = 0, b4L = 0, b5L = 0, b6L = 0;
+      let b0R = 0, b1R = 0, b2R = 0, b3R = 0, b4R = 0, b5R = 0, b6R = 0;
+
+      for (let i = 0; i < bufferSize; i++) {
+        const whiteL = Math.random() * 2 - 1;
+        b0L = 0.99886 * b0L + whiteL * 0.0555179;
+        b1L = 0.99332 * b1L + whiteL * 0.0750759;
+        b2L = 0.96900 * b2L + whiteL * 0.1538520;
+        b3L = 0.86650 * b3L + whiteL * 0.3104856;
+        b4L = 0.55000 * b4L + whiteL * 0.5329522;
+        b5L = -0.7616 * b5L - whiteL * 0.0168980;
+        left[i] = (b0L + b1L + b2L + b3L + b4L + b5L + b6L + whiteL * 0.5362) * 0.11;
+        b6L = whiteL * 0.115926;
+
+        const whiteR = Math.random() * 2 - 1;
+        b0R = 0.99886 * b0R + whiteR * 0.0555179;
+        b1R = 0.99332 * b1R + whiteR * 0.0750759;
+        b2R = 0.96900 * b2R + whiteR * 0.1538520;
+        b3R = 0.86650 * b3R + whiteR * 0.3104856;
+        b4R = 0.55000 * b4R + whiteR * 0.5329522;
+        b5R = -0.7616 * b5R - whiteR * 0.0168980;
+        right[i] = (b0R + b1R + b2R + b3R + b4R + b5R + b6R + whiteR * 0.5362) * 0.11;
+        b6R = whiteR * 0.115926;
+      }
+    } else {
+      // Brown noise (integrated white noise) for deep riverbed rumble
+      let lastOutL = 0.0;
+      let lastOutR = 0.0;
+      for (let i = 0; i < bufferSize; i++) {
+        const whiteL = Math.random() * 2 - 1;
+        left[i] = (lastOutL + 0.02 * whiteL) / 1.02;
+        lastOutL = left[i];
+        left[i] *= 0.3;
+
+        const whiteR = Math.random() * 2 - 1;
+        right[i] = (lastOutR + 0.02 * whiteR) / 1.02;
+        lastOutR = right[i];
+        right[i] *= 0.3;
+      }
+    }
+
+    return noiseBuffer;
+  }
+
+  // Synthesizes a natural, sweet procedural birdsong motif (Pakshi Kalarav)
+  private playForestBirdCall() {
+    if (!this.ctx || !this.natureBirdGain || !this.isNaturePlaying) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      const motifType = Math.floor(Math.random() * 3);
+
+      if (motifType === 0) {
+        // Motif 1: Morning Bulbul warble (3 melodic rising & falling chirps)
+        const notes = [3100, 3750, 3350];
+        notes.forEach((baseFreq, i) => {
+          const chirpTime = now + i * 0.14 + Math.random() * 0.02;
+          const osc = this.ctx!.createOscillator();
+          const chirpGain = this.ctx!.createGain();
+          const fmOsc = this.ctx!.createOscillator();
+          const fmGain = this.ctx!.createGain();
+
+          // FM trill modulation
+          fmOsc.type = "sine";
+          fmOsc.frequency.setValueAtTime(38, chirpTime);
+          fmGain.gain.setValueAtTime(45, chirpTime);
+          fmOsc.connect(osc.frequency);
+
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(baseFreq, chirpTime);
+          osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.25, chirpTime + 0.05);
+          osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.9, chirpTime + 0.11);
+
+          chirpGain.gain.setValueAtTime(0, chirpTime);
+          chirpGain.gain.linearRampToValueAtTime(0.04, chirpTime + 0.015);
+          chirpGain.gain.exponentialRampToValueAtTime(0.0001, chirpTime + 0.12);
+
+          osc.connect(chirpGain);
+          chirpGain.connect(this.natureBirdGain!);
+
+          fmOsc.start(chirpTime);
+          osc.start(chirpTime);
+          fmOsc.stop(chirpTime + 0.13);
+          osc.stop(chirpTime + 0.13);
+        });
+      } else if (motifType === 1) {
+        // Motif 2: Sweet Forest Sunbird (High upward glissando + soft echo)
+        const baseFreq = 3400 + Math.random() * 400;
+        const osc = this.ctx.createOscillator();
+        const chirpGain = this.ctx.createGain();
+
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(baseFreq, now);
+        osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.35, now + 0.08);
+        osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.05, now + 0.16);
+
+        chirpGain.gain.setValueAtTime(0, now);
+        chirpGain.gain.linearRampToValueAtTime(0.05, now + 0.02);
+        chirpGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+
+        osc.connect(chirpGain);
+        chirpGain.connect(this.natureBirdGain);
+
+        osc.start(now);
+        osc.stop(now + 0.2);
+
+        // Echo chirp after 120ms
+        const echoOsc = this.ctx.createOscillator();
+        const echoGain = this.ctx.createGain();
+        echoOsc.type = "sine";
+        echoOsc.frequency.setValueAtTime(baseFreq * 1.15, now + 0.18);
+        echoOsc.frequency.exponentialRampToValueAtTime(baseFreq * 1.4, now + 0.24);
+        echoGain.gain.setValueAtTime(0, now + 0.18);
+        echoGain.gain.linearRampToValueAtTime(0.03, now + 0.19);
+        echoGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.32);
+
+        echoOsc.connect(echoGain);
+        echoGain.connect(this.natureBirdGain);
+
+        echoOsc.start(now + 0.18);
+        echoOsc.stop(now + 0.33);
+      } else {
+        // Motif 3: Himalayan Wood Thrush (Double bell-tone flute call)
+        const f1 = 2600 + Math.random() * 200;
+        const f2 = f1 * 1.33; // 4th interval
+        [f1, f2].forEach((freq, idx) => {
+          const startTime = now + idx * 0.18;
+          const osc = this.ctx!.createOscillator();
+          const g = this.ctx!.createGain();
+
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(freq, startTime);
+          osc.frequency.linearRampToValueAtTime(freq * 1.04, startTime + 0.08);
+
+          g.gain.setValueAtTime(0, startTime);
+          g.gain.linearRampToValueAtTime(0.035, startTime + 0.025);
+          g.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.16);
+
+          osc.connect(g);
+          g.connect(this.natureBirdGain!);
+
+          osc.start(startTime);
+          osc.stop(startTime + 0.18);
+        });
+      }
+    } catch (e) {
+      console.warn("Birdsong synthesis error:", e);
+    }
+  }
+
+  // Starts authentic 4-string Tanpura loop: Pa (G#3 ~207Hz), Sa (C#4 ~277Hz), Sa (C#4 ~277Hz), Kharja Sa (C#3 ~138Hz)
+  public toggleTanpura(onState?: boolean, gainLevel?: number): boolean {
+    const ctx = this.getAudioContext();
+    if (gainLevel !== undefined) {
+      this.tanpuraVolumeLevel = gainLevel;
+    }
 
     if (this.isTanpuraPlaying || onState === false) {
       // Stop Tanpura
@@ -135,11 +397,12 @@ class IndianSoundscapeService {
         this.tanpuraGain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.5);
       }
       this.isTanpuraPlaying = false;
+      this.notifySoundscape();
       return false;
     } else {
       // Start Tanpura
       this.tanpuraGain = ctx.createGain();
-      this.tanpuraGain.gain.setValueAtTime(0.3, ctx.currentTime);
+      this.tanpuraGain.gain.setValueAtTime(this.tanpuraVolumeLevel, ctx.currentTime);
       this.tanpuraGain.connect(ctx.destination);
 
       const baseSa = 138.59; // C#3 (Kharja)
@@ -159,6 +422,7 @@ class IndianSoundscapeService {
       this.isTanpuraPlaying = true;
       playCycle();
       this.tanpuraInterval = setInterval(playCycle, 4400);
+      this.notifySoundscape();
       return true;
     }
   }
@@ -167,8 +431,200 @@ class IndianSoundscapeService {
     return this.isTanpuraPlaying;
   }
 
+  public setTanpuraVolume(volume: number) {
+    this.tanpuraVolumeLevel = Math.max(0, Math.min(1, volume));
+    if (this.ctx && this.tanpuraGain && this.isTanpuraPlaying) {
+      this.tanpuraGain.gain.linearRampToValueAtTime(this.tanpuraVolumeLevel, this.ctx.currentTime + 0.1);
+    }
+    this.notifySoundscape();
+  }
+
+  // Toggles Zen Nature Soundscape (River Stream, Forest Wind, and Himalayan Birdsong)
+  public toggleZenNature(onState?: boolean, gainLevel?: number): boolean {
+    const ctx = this.getAudioContext();
+    if (gainLevel !== undefined) {
+      this.natureVolumeLevel = gainLevel;
+    }
+
+    if (this.isNaturePlaying || onState === false) {
+      // Stop Zen Nature
+      if (this.natureBirdTimer) {
+        clearTimeout(this.natureBirdTimer);
+        this.natureBirdTimer = null;
+      }
+      if (this.natureGain) {
+        this.natureGain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.5);
+      }
+      setTimeout(() => {
+        try {
+          if (this.streamNoiseNode) {
+            this.streamNoiseNode.stop();
+            this.streamNoiseNode.disconnect();
+            this.streamNoiseNode = null;
+          }
+          if (this.windNoiseNode) {
+            this.windNoiseNode.stop();
+            this.windNoiseNode.disconnect();
+            this.windNoiseNode = null;
+          }
+          if (this.streamLfo) {
+            this.streamLfo.stop();
+            this.streamLfo.disconnect();
+            this.streamLfo = null;
+          }
+          if (this.windLfo) {
+            this.windLfo.stop();
+            this.windLfo.disconnect();
+            this.windLfo = null;
+          }
+        } catch {
+          // ignore cleanup err
+        }
+      }, 550);
+
+      this.isNaturePlaying = false;
+      this.notifySoundscape();
+      return false;
+    } else {
+      // Start Zen Nature Soundscape
+      try {
+        const now = ctx.currentTime;
+
+        // Master Nature Gain
+        this.natureGain = ctx.createGain();
+        this.natureGain.gain.setValueAtTime(this.natureVolumeLevel, now);
+        this.natureGain.connect(ctx.destination);
+
+        // 1. River Stream Synthesis (Prakriti Dhara)
+        const streamBuffer = this.createNoiseBuffer("pink", 5);
+        this.streamNoiseNode = ctx.createBufferSource();
+        this.streamNoiseNode.buffer = streamBuffer;
+        this.streamNoiseNode.loop = true;
+
+        const streamFilter = ctx.createBiquadFilter();
+        streamFilter.type = "lowpass";
+        streamFilter.frequency.setValueAtTime(540, now);
+        streamFilter.Q.setValueAtTime(1.8, now);
+
+        // Stream LFO for bubbling ripple swells
+        this.streamLfo = ctx.createOscillator();
+        this.streamLfo.type = "sine";
+        this.streamLfo.frequency.setValueAtTime(0.28, now); // ~3.5s swell cycle
+        const streamLfoGain = ctx.createGain();
+        streamLfoGain.gain.setValueAtTime(180, now); // modulates filter cutoff ±180Hz
+        this.streamLfo.connect(streamLfoGain);
+        streamLfoGain.connect(streamFilter.frequency);
+
+        this.natureStreamGain = ctx.createGain();
+        this.natureStreamGain.gain.setValueAtTime(0.55, now);
+
+        this.streamNoiseNode.connect(streamFilter);
+        streamFilter.connect(this.natureStreamGain);
+        this.natureStreamGain.connect(this.natureGain);
+
+        this.streamNoiseNode.start(now);
+        this.streamLfo.start(now);
+
+        // 2. Forest Wind & Canopy Breeze Synthesis (Vana Pavana)
+        const windBuffer = this.createNoiseBuffer("pink", 6);
+        this.windNoiseNode = ctx.createBufferSource();
+        this.windNoiseNode.buffer = windBuffer;
+        this.windNoiseNode.loop = true;
+
+        const windFilter = ctx.createBiquadFilter();
+        windFilter.type = "bandpass";
+        windFilter.frequency.setValueAtTime(450, now);
+        windFilter.Q.setValueAtTime(2.2, now);
+
+        this.windLfo = ctx.createOscillator();
+        this.windLfo.type = "sine";
+        this.windLfo.frequency.setValueAtTime(0.06, now); // ~16s slow wind breath
+        const windLfoGain = ctx.createGain();
+        windLfoGain.gain.setValueAtTime(220, now);
+        this.windLfo.connect(windLfoGain);
+        windLfoGain.connect(windFilter.frequency);
+
+        this.natureWindGain = ctx.createGain();
+        this.natureWindGain.gain.setValueAtTime(0.35, now);
+
+        this.windNoiseNode.connect(windFilter);
+        windFilter.connect(this.natureWindGain);
+        this.natureWindGain.connect(this.natureGain);
+
+        this.windNoiseNode.start(now);
+        this.windLfo.start(now);
+
+        // 3. Himalayan Forest Birds (Pakshi Kalarav)
+        this.natureBirdGain = ctx.createGain();
+        this.natureBirdGain.gain.setValueAtTime(0.85, now);
+        this.natureBirdGain.connect(this.natureGain);
+
+        const scheduleNextBird = () => {
+          if (!this.isNaturePlaying) return;
+          const nextInterval = 3200 + Math.random() * 4500; // 3.2s to 7.7s
+          this.natureBirdTimer = setTimeout(() => {
+            if (this.isNaturePlaying) {
+              this.playForestBirdCall();
+              scheduleNextBird();
+            }
+          }, nextInterval);
+        };
+
+        // First bird call in 1.5s
+        this.natureBirdTimer = setTimeout(() => {
+          if (this.isNaturePlaying) {
+            this.playForestBirdCall();
+            scheduleNextBird();
+          }
+        }, 1400);
+
+        this.isNaturePlaying = true;
+        this.notifySoundscape();
+        return true;
+      } catch (err) {
+        console.error("Failed to start Zen Nature soundscape:", err);
+        this.isNaturePlaying = false;
+        return false;
+      }
+    }
+  }
+
+  public isZenNatureActive(): boolean {
+    return this.isNaturePlaying;
+  }
+
+  public setNatureVolume(volume: number) {
+    this.natureVolumeLevel = Math.max(0, Math.min(1, volume));
+    if (this.ctx && this.natureGain && this.isNaturePlaying) {
+      this.natureGain.gain.linearRampToValueAtTime(this.natureVolumeLevel, this.ctx.currentTime + 0.1);
+    }
+    this.notifySoundscape();
+  }
+
+  // Set soundscape presets: 'tanpura' | 'nature' | 'both' | 'off'
+  public setSoundscapePreset(preset: "tanpura" | "nature" | "both" | "off"): SoundscapeState {
+    if (preset === "tanpura") {
+      this.toggleTanpura(true);
+      this.toggleZenNature(false);
+    } else if (preset === "nature") {
+      this.toggleTanpura(false);
+      this.toggleZenNature(true);
+    } else if (preset === "both") {
+      this.toggleTanpura(true);
+      this.toggleZenNature(true);
+    } else if (preset === "off") {
+      this.toggleTanpura(false);
+      this.toggleZenNature(false);
+    }
+    return this.getSoundscapeState();
+  }
+
   public toggleDrone(onState?: boolean): boolean {
     return this.toggleTanpura(onState);
+  }
+
+  public isAnySoundscapeActive(): boolean {
+    return this.isTanpuraPlaying || this.isNaturePlaying;
   }
 
   // Play peaceful temple bell / gong on discovery or quiz win
@@ -236,7 +692,7 @@ class IndianSoundscapeService {
   }
 
   /**
-   * Cleans text for high-fidelity natural speech recitation
+   * Cleans and enhances text for authentic natural speech recitation
    */
   public cleanTextForSpeech(raw: string): string {
     if (!raw) return "";
@@ -247,8 +703,13 @@ class IndianSoundscapeService {
       .replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1") // markdown links [text](url) -> text
       .replace(/[*_#~]/g, "") // markdown formatting
       .replace(/•/g, ", ") // bullet points to natural pauses
-      .replace(/॥/g, ".") // Vedic double danda to full stop
-      .replace(/।/g, ",") // Vedic single danda to comma
+      .replace(/॥/g, ". ") // Vedic double danda to full stop
+      .replace(/।/g, ", ") // Vedic single danda to natural breath comma
+      .replace(/\bBCE\b/g, "Before Common Era")
+      .replace(/\bCE\b/g, "Common Era")
+      .replace(/\bAD\b/g, "Anno Domini")
+      .replace(/\bc\.\s*(\d+)/g, "circa $1")
+      .replace(/\bapprox\./g, "approximately")
       .replace(/(\r\n|\n|\r)/gm, " ") // linebreaks to spaces
       .replace(/\s+/g, " ") // normalize multiple spaces
       .trim();
@@ -304,7 +765,7 @@ class IndianSoundscapeService {
   /**
    * Finds the most natural, human-sounding voice available in the browser
    */
-  public selectBestNaturalVoice(lang: string = "Hindi"): SpeechSynthesisVoice | null {
+  public selectBestNaturalVoice(lang: string = "Hindi", preferredVoiceName?: string): SpeechSynthesisVoice | null {
     if (!("speechSynthesis" in window)) return null;
 
     if (this.availableVoices.length === 0) {
@@ -313,6 +774,12 @@ class IndianSoundscapeService {
 
     const voices = this.availableVoices;
     if (voices.length === 0) return null;
+
+    // Preferred voice override if specified
+    if (preferredVoiceName) {
+      const customMatch = voices.find((v) => v.name.toLowerCase().includes(preferredVoiceName.toLowerCase()));
+      if (customMatch) return customMatch;
+    }
 
     const langCodeMap: Record<string, string[]> = {
       Hindi: ["hi-IN", "hi"],
@@ -378,12 +845,7 @@ class IndianSoundscapeService {
     utteranceId: string | null = null,
     onEndCallback?: () => void,
     onStartCallback?: () => void,
-    options?: {
-      rate?: number;
-      pitch?: number;
-      volume?: number;
-      onChunkProgress?: (chunkIndex: number, totalChunks: number) => void;
-    }
+    options?: TTSOptions
   ): boolean {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
       return false;
@@ -396,13 +858,22 @@ class IndianSoundscapeService {
 
     this.currentSpeakingId = utteranceId;
     this.isSpeechActive = true;
+    this.isSpeechPaused = false;
     this.currentUtteranceIndex = 0;
+    this.speechChunksRaw = chunks;
     this.speechUtteranceQueue = [];
 
-    const voice = this.selectBestNaturalVoice(lang);
-    const targetRate = options?.rate ?? 0.94;
+    const voice = this.selectBestNaturalVoice(lang, options?.voiceName);
+    const targetRate = options?.rate ?? 0.95;
+    this.currentPlaybackRate = targetRate;
     const targetPitch = options?.pitch ?? 1.0;
     const targetVolume = options?.volume ?? 1.0;
+
+    // Optional background drone
+    if (options?.enableAmbientDrone && !this.isTanpuraPlaying) {
+      this.toggleTanpura(true, 0.12);
+      this.autoAmbientDroneEnabled = true;
+    }
 
     // Build speech queue
     chunks.forEach((chunkText, idx) => {
@@ -414,7 +885,7 @@ class IndianSoundscapeService {
         utterance.lang = lang === "English" ? "en-IN" : "hi-IN";
       }
 
-      // Natural, reverent cadence: slightly measured for clarity
+      // Natural, reverent cadence
       utterance.rate = targetRate;
       utterance.pitch = targetPitch;
       utterance.volume = targetVolume;
@@ -422,26 +893,34 @@ class IndianSoundscapeService {
       if (idx === 0) {
         utterance.onstart = () => {
           this.isSpeechActive = true;
+          this.isSpeechPaused = false;
           this.notifyState(lang);
           if (options?.onChunkProgress) {
-            options.onChunkProgress(0, chunks.length);
+            options.onChunkProgress(0, chunks.length, chunkText);
           }
           if (onStartCallback) onStartCallback();
+          if (options?.onStart) options.onStart();
         };
       }
 
       utterance.onend = () => {
         this.currentUtteranceIndex++;
-        if (options?.onChunkProgress) {
-          options.onChunkProgress(this.currentUtteranceIndex, chunks.length);
+        this.notifyState(lang);
+        if (options?.onChunkProgress && this.currentUtteranceIndex < chunks.length) {
+          options.onChunkProgress(
+            this.currentUtteranceIndex,
+            chunks.length,
+            this.speechChunksRaw[this.currentUtteranceIndex] || ""
+          );
         }
         if (this.currentUtteranceIndex >= this.speechUtteranceQueue.length) {
           this.cleanupSpeech();
           if (onEndCallback) onEndCallback();
+          if (options?.onEnd) options.onEnd();
         } else {
           // Play next chunk
           const nextUtterance = this.speechUtteranceQueue[this.currentUtteranceIndex];
-          if (nextUtterance && this.isSpeechActive) {
+          if (nextUtterance && this.isSpeechActive && !this.isSpeechPaused) {
             window.speechSynthesis.speak(nextUtterance);
           }
         }
@@ -451,6 +930,7 @@ class IndianSoundscapeService {
         console.warn("Speech synthesis chunk error:", e);
         this.cleanupSpeech();
         if (onEndCallback) onEndCallback();
+        if (options?.onEnd) options.onEnd();
       };
 
       this.speechUtteranceQueue.push(utterance);
@@ -481,9 +961,15 @@ class IndianSoundscapeService {
       clearInterval(this.speechKeepAliveInterval);
       this.speechKeepAliveInterval = null;
     }
+    if (this.autoAmbientDroneEnabled) {
+      this.toggleTanpura(false);
+      this.autoAmbientDroneEnabled = false;
+    }
     this.isSpeechActive = false;
+    this.isSpeechPaused = false;
     this.currentSpeakingId = null;
     this.speechUtteranceQueue = [];
+    this.speechChunksRaw = [];
     this.currentUtteranceIndex = 0;
     this.notifyState();
   }
@@ -498,7 +984,7 @@ class IndianSoundscapeService {
   public pauseSpeaking() {
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.pause();
-      this.isSpeechActive = false;
+      this.isSpeechPaused = true;
       this.notifyState();
     }
   }
@@ -506,8 +992,17 @@ class IndianSoundscapeService {
   public resumeSpeaking() {
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.resume();
+      this.isSpeechPaused = false;
       this.isSpeechActive = true;
       this.notifyState();
+    }
+  }
+
+  public togglePauseSpeaking() {
+    if (this.isSpeechPaused) {
+      this.resumeSpeaking();
+    } else if (this.isSpeechActive) {
+      this.pauseSpeaking();
     }
   }
 
@@ -516,6 +1011,10 @@ class IndianSoundscapeService {
       this.isSpeechActive ||
       (typeof window !== "undefined" && "speechSynthesis" in window && window.speechSynthesis.speaking)
     );
+  }
+
+  public isPaused(): boolean {
+    return this.isSpeechPaused;
   }
 
   public getCurrentSpeakingId(): string | null {
@@ -531,3 +1030,4 @@ class IndianSoundscapeService {
 }
 
 export const soundscape = new IndianSoundscapeService();
+

@@ -17,7 +17,7 @@ export const Footer: React.FC = () => {
 
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-amber-300/60">
           <div className="flex items-center gap-2">
-            <span className="font-royal text-sm font-bold text-amber-200">BHARAT GPT</span>
+            <span className="font-royal text-sm font-bold text-amber-200">PRAJNA BHARAT GPT</span>
             <span>•</span>
             <span className="font-indic">भारतीय ज्ञान एवं विरासत मंच</span>
           </div>

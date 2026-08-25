@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Compass,
   Search,
@@ -22,21 +22,39 @@ import { HERITAGE_ITEMS } from "../data/heritageData";
 import { HeritageCategory, HeritageItem, SavedItem } from "../types";
 import { soundscape } from "../services/audioSynth";
 import { ExplorerGridSkeleton } from "./SkeletonLoader";
+import { karmaService } from "../services/karmaService";
 
 interface ExplorerSectionProps {
   onAskBharatGPT: (prompt: string) => void;
   onSaveItem: (item: SavedItem) => void;
+  initialHeritageId?: string | null;
+  onClearInitialHeritage?: () => void;
 }
 
 export const ExplorerSection: React.FC<ExplorerSectionProps> = ({
   onAskBharatGPT,
   onSaveItem,
+  initialHeritageId,
+  onClearInitialHeritage,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<HeritageCategory>("all");
   const [selectedRegion, setSelectedRegion] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeModalItem, setActiveModalItem] = useState<HeritageItem | null>(null);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+
+  // Handle incoming selection from global search bar
+  useEffect(() => {
+    if (initialHeritageId) {
+      const found = HERITAGE_ITEMS.find((h) => h.id === initialHeritageId);
+      if (found) {
+        setActiveModalItem(found);
+      }
+      if (onClearInitialHeritage) {
+        onClearInitialHeritage();
+      }
+    }
+  }, [initialHeritageId]);
 
   const categories = [
     { id: "all", label: "All Heritage", indic: "समस्त", icon: Compass },
@@ -60,6 +78,12 @@ export const ExplorerSection: React.FC<ExplorerSectionProps> = ({
       item.summary.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesRegion && matchesSearch;
   });
+
+  const handleOpenItemModal = (item: HeritageItem) => {
+    setActiveModalItem(item);
+    soundscape.playTempleBell();
+    karmaService.addKarma(15, `Heritage Deep Dive • ${item.title}`, "explorer");
+  };
 
   const handleSaveHeritage = (item: HeritageItem) => {
     onSaveItem({
@@ -223,7 +247,7 @@ export const ExplorerSection: React.FC<ExplorerSectionProps> = ({
                 {/* Action Buttons */}
                 <div className="pt-2 border-t border-amber-500/15 flex items-center justify-between gap-2">
                   <button
-                    onClick={() => setActiveModalItem(item)}
+                    onClick={() => handleOpenItemModal(item)}
                     className="text-xs text-amber-300 hover:text-amber-100 font-semibold flex items-center gap-1 bg-amber-950/40 hover:bg-amber-900/60 border border-amber-500/30 px-3 py-1.5 rounded-lg transition-colors flex-1 justify-center"
                   >
                     <span>Inspect Deep Dive</span>
@@ -232,7 +256,7 @@ export const ExplorerSection: React.FC<ExplorerSectionProps> = ({
                   <button
                     onClick={() => onAskBharatGPT(item.suggestedPrompt)}
                     className="text-xs bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all shadow-md shadow-amber-950/60"
-                    title="Ask Bharat GPT"
+                    title="Ask Prajna BharatGPT"
                   >
                     <MessageSquare className="w-3 h-3" />
                     <span>Inquire</span>
@@ -369,7 +393,7 @@ export const ExplorerSection: React.FC<ExplorerSectionProps> = ({
                   className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-bold px-6 py-2.5 rounded-xl text-xs sm:text-sm shadow-lg shadow-amber-950/60 transition-all hover:scale-[1.02]"
                 >
                   <MessageSquare className="w-4 h-4" />
-                  <span>Ask Bharat GPT about this site</span>
+                  <span>Ask Prajna BharatGPT about this site</span>
                 </button>
               </div>
             </div>

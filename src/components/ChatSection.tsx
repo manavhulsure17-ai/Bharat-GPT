@@ -33,6 +33,7 @@ import { AiMode, ChatMessage, IndicLanguageCode, PersonaType, SavedItem } from "
 import { sendChatMessage, transcribeAudio } from "../services/geminiService";
 import { soundscape } from "../services/audioSynth";
 import { ChatResponseSkeleton } from "./SkeletonLoader";
+import { toast } from "../services/toastService";
 
 const PROMPT_HISTORY_STORAGE_KEY = "bharat_gpt_prompt_history_v1";
 
@@ -95,7 +96,7 @@ export const ChatSection: React.FC<ChatSectionProps> = ({
       persona: "scholar",
       language: selectedLanguage,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      text: `### **नमस्ते (Namaste) & Welcome to Bharat GPT** 🙏\n\nI am your companion in exploring the boundless depth of Indian heritage, philosophy, sciences, languages, and history.\n\n*Choose a specialized Indic Persona above or ask anything about:*\n• **Vedic Philosophy & Gita:** Karma Yoga, Upanishads, Advaita, Meditation\n• **Monumental Architecture:** Konark, Kailasa Temple, Brihadeeswarar, Hampi\n• **Ancient Indian Sciences:** Sushruta's surgery, Aryabhata's astronomy, Wootz steel, Ayurveda\n• **Epics & Folktales:** Ramayana, Mahabharata, Panchatantra, regional valor\n\nHow may I illuminate your inquiry today?`,
+      text: `### **नमस्ते (Namaste) & Welcome to Prajna BharatGPT** 🙏\n\nI am your companion in exploring the boundless depth of Indian heritage, philosophy, sciences, languages, and history.\n\n*Choose a specialized Indic Persona above or ask anything about:*\n• **Vedic Philosophy & Gita:** Karma Yoga, Upanishads, Advaita, Meditation\n• **Monumental Architecture:** Konark, Kailasa Temple, Brihadeeswarar, Hampi\n• **Ancient Indian Sciences:** Sushruta's surgery, Aryabhata's astronomy, Wootz steel, Ayurveda\n• **Epics & Folktales:** Ramayana, Mahabharata, Panchatantra, regional valor\n\nHow may I illuminate your inquiry today?`,
     },
   ]);
 
@@ -403,6 +404,7 @@ export const ChatSection: React.FC<ChatSectionProps> = ({
   const handleCopy = (id: string, text: string) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
+    toast.success("Text copied to clipboard!", { title: "Copied" });
     setTimeout(() => setCopiedId(null), 2000);
   };
 
@@ -432,7 +434,6 @@ export const ChatSection: React.FC<ChatSectionProps> = ({
       data: msg,
     });
     setSavedIds((prev) => new Set(prev).add(msg.id));
-    soundscape.playTempleBell();
   };
 
   const clearChat = () => {
@@ -446,6 +447,7 @@ export const ChatSection: React.FC<ChatSectionProps> = ({
         text: `### **संवाद पुनः प्रारंभ (New Dialogue Started)**\n\nI am listening as **${currentPersona.name} (${currentPersona.indicName})**. What aspect of Indian wisdom or culture would you like to explore?`,
       },
     ]);
+    toast.info("Started a new conversation session.", { title: "Conversation Reset" });
   };
 
   return (

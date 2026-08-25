@@ -45,7 +45,7 @@ export const DeploymentModal: React.FC<DeploymentModalProps> = ({
             </div>
             <div>
               <h3 className="font-royal text-lg sm:text-xl font-bold text-amber-100">
-                Bharat GPT Technical & Deployment Guide
+                Prajna BharatGPT Technical & Deployment Guide
               </h3>
               <p className="text-xs text-amber-300/70">
                 How to run locally, configure secret keys, and deploy to production
@@ -96,7 +96,7 @@ export const DeploymentModal: React.FC<DeploymentModalProps> = ({
                 1. Local Machine Launch (Step-by-Step)
               </h4>
               <p className="text-xs text-amber-200/80">
-                You can run the entire Bharat GPT application locally in standard Node.js:
+                You can run the entire Prajna BharatGPT application locally in standard Node.js:
               </p>
 
               <div className="space-y-3">

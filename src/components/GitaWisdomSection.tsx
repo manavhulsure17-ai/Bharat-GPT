@@ -24,10 +24,16 @@ import { IndicLanguageCode, SavedItem, ShlokaItem, GitaChapter } from "../types"
 import { fetchShlokaGuidance } from "../services/geminiService";
 import { soundscape } from "../services/audioSynth";
 import { ShlokaSkeleton } from "./SkeletonLoader";
+import { toast } from "../services/toastService";
+import { karmaService } from "../services/karmaService";
+import { InteractiveTextHighlight } from "./InteractiveTextHighlight";
 
 interface GitaWisdomSectionProps {
   selectedLanguage: IndicLanguageCode;
   onSaveItem: (item: SavedItem) => void;
+  initialChapterNumber?: number | null;
+  initialShlokaId?: string | null;
+  onClearInitialSelection?: () => void;
 }
 
 const LOCAL_STORAGE_KEY = "bharat_gita_explored_chapters_v1";
@@ -35,6 +41,9 @@ const LOCAL_STORAGE_KEY = "bharat_gita_explored_chapters_v1";
 export const GitaWisdomSection: React.FC<GitaWisdomSectionProps> = ({
   selectedLanguage,
   onSaveItem,
+  initialChapterNumber,
+  initialShlokaId,
+  onClearInitialSelection,
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeShloka, setActiveShloka] = useState<ShlokaItem>(SHLOKA_WISDOM_COLLECTION[0]);
@@ -62,6 +71,26 @@ export const GitaWisdomSection: React.FC<GitaWisdomSectionProps> = ({
 
   const [selectedChapter, setSelectedChapter] = useState<GitaChapter>(GITA_CHAPTERS_DATA[1]); // Default to Chapter 2
   const [activeYogaSection, setActiveYogaSection] = useState<"all" | "karma" | "bhakti" | "jnana">("all");
+
+  // Handle incoming selection from global search bar
+  useEffect(() => {
+    if (initialChapterNumber) {
+      const chap = GITA_CHAPTERS_DATA.find((c) => c.chapterNumber === initialChapterNumber);
+      if (chap) {
+        setSelectedChapter(chap);
+        setExploredChapters((prev) => new Set(prev).add(chap.chapterNumber));
+      }
+    }
+    if (initialShlokaId) {
+      const shloka = SHLOKA_WISDOM_COLLECTION.find((s) => s.id === initialShlokaId);
+      if (shloka) {
+        setActiveShloka(shloka);
+      }
+    }
+    if ((initialChapterNumber || initialShlokaId) && onClearInitialSelection) {
+      onClearInitialSelection();
+    }
+  }, [initialChapterNumber, initialShlokaId]);
 
   // Save to local storage whenever explored chapters change
   useEffect(() => {
@@ -105,9 +134,19 @@ export const GitaWisdomSection: React.FC<GitaWisdomSectionProps> = ({
   };
 
   const handleSelectChapter = (chapter: GitaChapter) => {
+    const isNew = !exploredChapters.has(chapter.chapterNumber);
     setSelectedChapter(chapter);
     markChapterExplored(chapter.chapterNumber);
     soundscape.playTempleBell();
+
+    if (isNew) {
+      karmaService.addKarma(
+        20,
+        `Gita Chapter ${chapter.chapterNumber} • ${chapter.sanskritTitle}`,
+        "gita"
+      );
+      karmaService.recordActivity("gitaChaptersExplored", 1);
+    }
   };
 
   const handleSeekFromChapter = (chapter: GitaChapter) => {
@@ -129,6 +168,13 @@ export const GitaWisdomSection: React.FC<GitaWisdomSectionProps> = ({
     try {
       const shloka = await fetchShlokaGuidance(query, selectedLanguage);
       setActiveShloka(shloka);
+
+      karmaService.addKarma(
+        25,
+        `Gita Guidance • ${shloka.source || "Sacred Shloka"}`,
+        "gita"
+      );
+      karmaService.recordActivity("gitaVersesRead", 1);
 
       // Auto-detect chapter from shloka metadata or source string
       const match = (shloka.chapterVerse || shloka.source || "").match(/chapter\s*(\d+)/i);
@@ -193,6 +239,7 @@ export const GitaWisdomSection: React.FC<GitaWisdomSectionProps> = ({
     const text = `${activeShloka.source}\n${activeShloka.sanskrit}\n\n${activeShloka.transliteration}\n\nMeaning:\n${activeShloka.translation}\n\nGuidance:\n${activeShloka.lifeGuidance}`;
     navigator.clipboard.writeText(text);
     setCopied(true);
+    toast.success("Gita Shloka and guidance copied to clipboard!", { title: "Copied Shloka" });
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -200,6 +247,7 @@ export const GitaWisdomSection: React.FC<GitaWisdomSectionProps> = ({
     if (window.confirm("Reset your 18 Chapters exploration progress?")) {
       setExploredChapters(new Set());
       soundscape.playTempleBell();
+      toast.info("Chapter exploration progress has been reset.", { title: "Progress Reset" });
     }
   };
 
@@ -207,6 +255,10 @@ export const GitaWisdomSection: React.FC<GitaWisdomSectionProps> = ({
     const all = new Set(GITA_CHAPTERS_DATA.map((c) => c.chapterNumber));
     setExploredChapters(all);
     soundscape.playTempleBell();
+    toast.success("Marked all 18 Chapters as explored! 🌟", { title: "Gita Journey" });
+    karmaService.addKarma(100, "Jnana Yajna • Explored all 18 Gita Chapters", "gita");
+    karmaService.recordActivity("gitaChaptersExplored", 18);
+    karmaService.unlockBadge("gita-jnana-yogi");
   };
 
   // Progress metrics calculation
@@ -223,7 +275,10 @@ export const GitaWisdomSection: React.FC<GitaWisdomSectionProps> = ({
   });
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-8">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-8 golden-selection-zone relative">
+      {/* Interactive Golden Highlight Tooltip on text selection */}
+      <InteractiveTextHighlight sectionName="Gita Wisdom" />
+
       {/* Title & Header */}
       <div className="text-center space-y-2 max-w-2xl mx-auto">
         <div className="inline-flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 px-3 py-1 rounded-full text-xs text-amber-300">
@@ -243,7 +298,7 @@ export const GitaWisdomSection: React.FC<GitaWisdomSectionProps> = ({
       {/* ========================================================================= */}
       <section
         id="gita-chapter-progress-tracker"
-        className="bg-gradient-to-b from-[#101828] via-[#0c1322] to-[#090e1a] border-2 border-amber-500/40 rounded-3xl p-5 sm:p-7 shadow-2xl space-y-6 relative overflow-hidden"
+        className="bg-gradient-to-b from-[#101828] via-[#0c1322] to-[#090e1a] border-2 border-amber-500/40 hover:border-amber-500/60 rounded-3xl p-5 sm:p-7 shadow-2xl hover:shadow-amber-500/10 hover:-translate-y-0.5 space-y-6 relative overflow-hidden transition-all duration-300"
       >
         {/* Background Mandala Watermark */}
         <div className="absolute top-0 right-0 w-80 h-80 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
@@ -264,7 +319,7 @@ export const GitaWisdomSection: React.FC<GitaWisdomSectionProps> = ({
 
           {/* Metric Pill and Quick Actions */}
           <div className="flex items-center gap-2 sm:self-center">
-            <div className="bg-amber-950/60 border border-amber-500/40 px-3.5 py-1.5 rounded-2xl flex items-center gap-2.5 shadow-inner">
+            <div className="bg-amber-950/60 border border-amber-500/40 hover:border-amber-500/60 px-3.5 py-1.5 rounded-2xl flex items-center gap-2.5 shadow-inner hover:shadow-md hover:shadow-amber-500/10 hover:scale-[1.02] transition-all duration-200">
               <Award className={`w-4 h-4 ${exploredCount === 18 ? "text-emerald-400" : "text-amber-400"}`} />
               <div className="text-right">
                 <span className="text-xs font-bold text-amber-100 block">
@@ -278,7 +333,7 @@ export const GitaWisdomSection: React.FC<GitaWisdomSectionProps> = ({
 
             <button
               onClick={exploredCount === 18 ? handleResetProgress : handleExploreAll}
-              className="p-2 rounded-xl bg-slate-900/80 border border-amber-500/30 hover:border-amber-400 text-amber-300 hover:text-amber-100 text-xs transition-colors"
+              className="p-2 rounded-xl bg-slate-900/80 border border-amber-500/30 hover:border-amber-400 text-amber-300 hover:text-amber-100 text-xs transition-all hover:scale-105 hover:shadow-md hover:shadow-amber-500/10"
               title={exploredCount === 18 ? "Reset Progress" : "Mark All 18 Chapters as Explored"}
             >
               {exploredCount === 18 ? <RotateCcw className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
@@ -322,7 +377,7 @@ export const GitaWisdomSection: React.FC<GitaWisdomSectionProps> = ({
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none border-b border-amber-500/15">
           <button
             onClick={() => setActiveYogaSection("all")}
-            className={`px-3 py-1 rounded-xl text-xs font-medium transition-all ${
+            className={`px-3 py-1 rounded-xl text-xs font-medium transition-all duration-200 hover:scale-[1.02] ${
               activeYogaSection === "all"
                 ? "bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/20"
                 : "bg-slate-900/60 text-amber-300/80 hover:text-amber-100 hover:bg-slate-800"
@@ -332,7 +387,7 @@ export const GitaWisdomSection: React.FC<GitaWisdomSectionProps> = ({
           </button>
           <button
             onClick={() => setActiveYogaSection("karma")}
-            className={`px-3 py-1 rounded-xl text-xs font-medium transition-all ${
+            className={`px-3 py-1 rounded-xl text-xs font-medium transition-all duration-200 hover:scale-[1.02] ${
               activeYogaSection === "karma"
                 ? "bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/20"
                 : "bg-slate-900/60 text-amber-300/80 hover:text-amber-100 hover:bg-slate-800"
@@ -342,7 +397,7 @@ export const GitaWisdomSection: React.FC<GitaWisdomSectionProps> = ({
           </button>
           <button
             onClick={() => setActiveYogaSection("bhakti")}
-            className={`px-3 py-1 rounded-xl text-xs font-medium transition-all ${
+            className={`px-3 py-1 rounded-xl text-xs font-medium transition-all duration-200 hover:scale-[1.02] ${
               activeYogaSection === "bhakti"
                 ? "bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/20"
                 : "bg-slate-900/60 text-amber-300/80 hover:text-amber-100 hover:bg-slate-800"
@@ -352,7 +407,7 @@ export const GitaWisdomSection: React.FC<GitaWisdomSectionProps> = ({
           </button>
           <button
             onClick={() => setActiveYogaSection("jnana")}
-            className={`px-3 py-1 rounded-xl text-xs font-medium transition-all ${
+            className={`px-3 py-1 rounded-xl text-xs font-medium transition-all duration-200 hover:scale-[1.02] ${
               activeYogaSection === "jnana"
                 ? "bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/20"
                 : "bg-slate-900/60 text-amber-300/80 hover:text-amber-100 hover:bg-slate-800"
@@ -372,9 +427,9 @@ export const GitaWisdomSection: React.FC<GitaWisdomSectionProps> = ({
               <button
                 key={chapter.chapterNumber}
                 onClick={() => handleSelectChapter(chapter)}
-                className={`relative group p-2.5 rounded-2xl border text-left transition-all flex flex-col justify-between ${
+                className={`relative group p-2.5 rounded-2xl border text-left transition-all duration-200 hover:scale-[1.03] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-amber-500/15 flex flex-col justify-between ${
                   isSelected
-                    ? "bg-gradient-to-b from-amber-950/90 to-orange-950/80 border-amber-400 shadow-lg shadow-amber-500/25 scale-[1.03] ring-1 ring-amber-400"
+                    ? "bg-gradient-to-b from-amber-950/90 to-orange-950/80 border-amber-400 shadow-lg shadow-amber-500/25 ring-1 ring-amber-400"
                     : isExplored
                     ? "bg-slate-900/80 border-amber-500/50 hover:border-amber-400 text-amber-100"
                     : "bg-slate-950/60 border-slate-800 hover:border-amber-500/30 text-amber-400/50 hover:text-amber-200"
@@ -424,7 +479,7 @@ export const GitaWisdomSection: React.FC<GitaWisdomSectionProps> = ({
 
         {/* Selected Chapter Deep Dive Card */}
         {selectedChapter && (
-          <div className="bg-gradient-to-r from-amber-950/40 via-slate-900 to-[#0e1628] border border-amber-500/30 rounded-2xl p-4 sm:p-5 space-y-3">
+          <div className="bg-gradient-to-r from-amber-950/40 via-slate-900 to-[#0e1628] border border-amber-500/30 hover:border-amber-500/50 rounded-2xl p-4 sm:p-5 space-y-3 shadow-md hover:shadow-xl hover:shadow-amber-500/10 hover:-translate-y-0.5 transition-all duration-300">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-500/20 pb-3">
               <div className="flex items-center gap-2">
                 <span className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-400/60 flex items-center justify-center font-bold text-amber-300 text-sm">
@@ -444,7 +499,7 @@ export const GitaWisdomSection: React.FC<GitaWisdomSectionProps> = ({
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => toggleChapterStatus(selectedChapter.chapterNumber)}
-                  className={`px-3 py-1.5 rounded-xl border text-xs flex items-center gap-1.5 transition-colors ${
+                  className={`px-3 py-1.5 rounded-xl border text-xs flex items-center gap-1.5 transition-all hover:scale-[1.02] ${
                     exploredChapters.has(selectedChapter.chapterNumber)
                       ? "bg-amber-500/20 border-amber-400 text-amber-200"
                       : "bg-slate-900 border-amber-500/30 text-amber-400/80 hover:text-amber-100"
@@ -456,7 +511,7 @@ export const GitaWisdomSection: React.FC<GitaWisdomSectionProps> = ({
 
                 <button
                   onClick={() => handleSeekFromChapter(selectedChapter)}
-                  className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-bold px-3.5 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-amber-950/50 transition-all hover:scale-[1.02]"
+                  className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-bold px-3.5 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-amber-950/50 transition-all hover:scale-[1.03]"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>Seek Shloka from Ch. {selectedChapter.chapterNumber}</span>
@@ -469,7 +524,7 @@ export const GitaWisdomSection: React.FC<GitaWisdomSectionProps> = ({
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-              <div className="bg-slate-900/80 border border-amber-500/20 rounded-xl p-3">
+              <div className="bg-slate-900/80 border border-amber-500/20 hover:border-amber-500/40 rounded-xl p-3 shadow-inner hover:shadow-md hover:shadow-amber-500/10 hover:-translate-y-0.5 transition-all duration-200">
                 <span className="text-[10px] uppercase font-bold tracking-wider text-amber-400/80 block mb-1">
                   Core Philosophical Insight (सार)
                 </span>
@@ -478,7 +533,7 @@ export const GitaWisdomSection: React.FC<GitaWisdomSectionProps> = ({
                 </p>
               </div>
 
-              <div className="bg-slate-900/80 border border-amber-500/20 rounded-xl p-3">
+              <div className="bg-slate-900/80 border border-amber-500/20 hover:border-amber-500/40 rounded-xl p-3 shadow-inner hover:shadow-md hover:shadow-amber-500/10 hover:-translate-y-0.5 transition-all duration-200">
                 <span className="text-[10px] uppercase font-bold tracking-wider text-amber-400/80 block mb-1">
                   Key Sanskrit Verse Snippet
                 </span>
@@ -492,7 +547,7 @@ export const GitaWisdomSection: React.FC<GitaWisdomSectionProps> = ({
       </section>
 
       {/* Inquiry & Life Dilemma Search */}
-      <div className="bg-[#0f172a]/95 border border-amber-500/30 rounded-3xl p-5 sm:p-7 shadow-2xl space-y-4">
+      <div className="bg-[#0f172a]/95 border border-amber-500/30 hover:border-amber-500/50 rounded-3xl p-5 sm:p-7 shadow-2xl hover:shadow-amber-500/10 hover:-translate-y-0.5 transition-all duration-300 space-y-4">
         <label className="text-xs uppercase font-bold tracking-wider text-amber-400 flex items-center gap-1.5">
           <Sparkles className="w-3.5 h-3.5 text-amber-400" />
           Ask Gita on your situation, emotion, or life question:
@@ -504,13 +559,13 @@ export const GitaWisdomSection: React.FC<GitaWisdomSectionProps> = ({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="e.g. 'Feeling overwhelmed by career goals and fear of making the wrong choice...'"
-            className="flex-1 bg-slate-900/90 border border-amber-500/30 focus:border-amber-400 rounded-xl px-4 py-3 text-xs sm:text-sm text-amber-100 placeholder:text-amber-400/40 focus:outline-none"
+            className="flex-1 bg-slate-900/90 border border-amber-500/30 focus:border-amber-400 rounded-xl px-4 py-3 text-xs sm:text-sm text-amber-100 placeholder:text-amber-400/40 focus:outline-none transition-colors"
             onKeyDown={(e) => e.key === "Enter" && handleSearchShloka()}
           />
           <button
             onClick={() => handleSearchShloka()}
             disabled={isLoading}
-            className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-bold px-5 sm:px-7 py-3 rounded-xl text-xs sm:text-sm flex items-center gap-2 shadow-lg shadow-amber-950/60 transition-all hover:scale-[1.02]"
+            className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-bold px-5 sm:px-7 py-3 rounded-xl text-xs sm:text-sm flex items-center gap-2 shadow-lg shadow-amber-950/60 transition-all hover:scale-[1.03]"
           >
             <Search className="w-4 h-4" />
             <span className="hidden sm:inline">Seek Shloka</span>
@@ -530,7 +585,7 @@ export const GitaWisdomSection: React.FC<GitaWisdomSectionProps> = ({
                   setSearchQuery(item.query);
                   handleSearchShloka(item.query, item.chapterNum);
                 }}
-                className="bg-slate-900/80 hover:bg-amber-950/50 text-amber-300/80 hover:text-amber-100 border border-amber-500/20 hover:border-amber-500/50 px-3 py-1.5 rounded-full text-xs whitespace-nowrap transition-colors flex-shrink-0 flex items-center gap-1.5"
+                className="bg-slate-900/80 hover:bg-amber-950/50 text-amber-300/80 hover:text-amber-100 border border-amber-500/20 hover:border-amber-500/50 px-3 py-1.5 rounded-full text-xs whitespace-nowrap transition-all duration-200 hover:scale-[1.03] hover:shadow-sm hover:shadow-amber-500/20 flex-shrink-0 flex items-center gap-1.5"
               >
                 <span>{item.label}</span>
                 <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.2 rounded-full">
@@ -546,7 +601,7 @@ export const GitaWisdomSection: React.FC<GitaWisdomSectionProps> = ({
       {isLoading ? (
         <ShlokaSkeleton />
       ) : (
-        <div className="bg-gradient-to-b from-[#11192e] to-[#0b101e] border-2 border-amber-500/40 rounded-3xl p-6 sm:p-10 shadow-2xl space-y-8 relative overflow-hidden bg-mandala-pattern">
+        <div className="bg-gradient-to-b from-[#11192e] to-[#0b101e] border-2 border-amber-500/40 hover:border-amber-500/60 rounded-3xl p-6 sm:p-10 shadow-2xl hover:shadow-amber-500/15 hover:-translate-y-0.5 transition-all duration-300 space-y-8 relative overflow-hidden bg-mandala-pattern">
           {/* Card Top Details */}
           <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-amber-500/20">
             <div className="flex items-center gap-2">
@@ -564,9 +619,9 @@ export const GitaWisdomSection: React.FC<GitaWisdomSectionProps> = ({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => handleSpeakShloka(activeShloka)}
-                className={`p-2 rounded-xl border text-xs flex items-center gap-1.5 transition-colors ${
+                className={`p-2 rounded-xl border text-xs flex items-center gap-1.5 transition-all hover:scale-105 ${
                   speakingId === activeShloka.id
-                    ? "bg-amber-500 text-slate-950 border-amber-400 animate-pulse"
+                    ? "bg-amber-500 text-slate-950 border-amber-400 animate-pulse shadow-md shadow-amber-500/30"
                     : "bg-slate-900 text-amber-200 border-amber-500/30 hover:bg-amber-950/50"
                 }`}
                 title="Recite Sanskrit Shloka aloud"
@@ -577,7 +632,7 @@ export const GitaWisdomSection: React.FC<GitaWisdomSectionProps> = ({
 
               <button
                 onClick={handleCopy}
-                className="p-2 rounded-xl bg-slate-900 text-amber-200 border border-amber-500/30 hover:bg-amber-950/50 text-xs flex items-center gap-1.5 transition-colors"
+                className="p-2 rounded-xl bg-slate-900 text-amber-200 border border-amber-500/30 hover:bg-amber-950/50 text-xs flex items-center gap-1.5 transition-all hover:scale-105"
                 title="Copy Shloka & Meaning"
               >
                 {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
@@ -586,9 +641,9 @@ export const GitaWisdomSection: React.FC<GitaWisdomSectionProps> = ({
 
               <button
                 onClick={() => handleSaveShloka(activeShloka)}
-                className={`p-2 rounded-xl border text-xs flex items-center gap-1.5 transition-colors ${
+                className={`p-2 rounded-xl border text-xs flex items-center gap-1.5 transition-all hover:scale-105 ${
                   savedIds.has(activeShloka.id)
-                    ? "bg-emerald-950 border-emerald-500/50 text-emerald-300"
+                    ? "bg-emerald-950 border-emerald-500/50 text-emerald-300 shadow-sm shadow-emerald-500/20"
                     : "bg-slate-900 text-amber-200 border-amber-500/30 hover:bg-amber-950/50"
                 }`}
                 title="Save to Vault"
@@ -600,7 +655,7 @@ export const GitaWisdomSection: React.FC<GitaWisdomSectionProps> = ({
           </div>
 
           {/* Sanskrit Devanagari Display */}
-          <div className="text-center space-y-4 py-4 px-2 sm:px-6 bg-amber-950/20 border border-amber-500/20 rounded-2xl">
+          <div className="text-center space-y-4 py-4 px-2 sm:px-6 bg-amber-950/20 border border-amber-500/20 hover:border-amber-500/40 rounded-2xl shadow-inner hover:shadow-lg hover:shadow-amber-500/10 hover:-translate-y-0.5 transition-all duration-300">
             <p className="font-indic text-xl sm:text-2xl md:text-3xl text-saffron-gradient font-bold leading-relaxed whitespace-pre-line">
               {activeShloka.sanskrit}
             </p>
@@ -619,7 +674,7 @@ export const GitaWisdomSection: React.FC<GitaWisdomSectionProps> = ({
                 {activeShloka.wordMeaning.map((wm, i) => (
                   <div
                     key={i}
-                    className="bg-slate-900/70 border border-amber-500/15 rounded-xl p-2.5 text-xs"
+                    className="bg-slate-900/70 border border-amber-500/15 hover:border-amber-500/40 rounded-xl p-2.5 text-xs shadow-sm hover:shadow-md hover:shadow-amber-500/10 hover:scale-[1.02] hover:-translate-y-0.5 transition-all duration-200"
                   >
                     <span className="font-bold text-amber-300 block font-indic">{wm.word}</span>
                     <span className="text-amber-200/70 text-[11px] block mt-0.5">{wm.meaning}</span>
@@ -630,7 +685,7 @@ export const GitaWisdomSection: React.FC<GitaWisdomSectionProps> = ({
           )}
 
           {/* Full Translation */}
-          <div className="space-y-2 bg-[#0e1628] border-l-4 border-amber-500 rounded-r-2xl p-4 sm:p-5 shadow-inner">
+          <div className="space-y-2 bg-[#0e1628] border-l-4 border-amber-500 hover:border-amber-400 rounded-r-2xl p-4 sm:p-5 shadow-inner hover:shadow-lg hover:shadow-amber-500/10 hover:-translate-y-0.5 transition-all duration-300">
             <h4 className="text-xs uppercase font-bold tracking-wider text-amber-400">
               Essence & Meaning (भावार्थ)
             </h4>
@@ -645,7 +700,7 @@ export const GitaWisdomSection: React.FC<GitaWisdomSectionProps> = ({
           </div>
 
           {/* Real-Life Practical Application Guidance */}
-          <div className="space-y-2 bg-gradient-to-r from-orange-950/40 via-amber-950/30 to-slate-900 border border-orange-500/30 rounded-2xl p-5 shadow-md">
+          <div className="space-y-2 bg-gradient-to-r from-orange-950/40 via-amber-950/30 to-slate-900 border border-orange-500/30 hover:border-orange-500/50 rounded-2xl p-5 shadow-md hover:shadow-xl hover:shadow-orange-500/15 hover:-translate-y-0.5 transition-all duration-300">
             <h4 className="text-xs uppercase font-bold tracking-wider text-orange-300 flex items-center gap-1.5">
               <Lightbulb className="w-4 h-4 text-orange-400" />
               Practical Modern Application (दैनिक जीवन में उपयोग)
@@ -681,9 +736,9 @@ export const GitaWisdomSection: React.FC<GitaWisdomSectionProps> = ({
                 }
                 window.scrollTo({ top: 400, behavior: "smooth" });
               }}
-              className={`p-4 rounded-2xl border text-left transition-all ${
+              className={`p-4 rounded-2xl border text-left transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-xl hover:shadow-amber-500/15 ${
                 activeShloka.id === shloka.id
-                  ? "bg-amber-950/60 border-amber-400 text-amber-100 shadow-md scale-[1.01]"
+                  ? "bg-amber-950/60 border-amber-400 text-amber-100 shadow-md ring-1 ring-amber-400/40"
                   : "bg-slate-900/60 border-amber-500/20 text-amber-200/80 hover:border-amber-500/50 hover:bg-slate-800/40"
               }`}
             >

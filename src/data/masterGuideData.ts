@@ -1,11 +1,11 @@
-export const ZERO_TO_HERO_MASTER_GUIDE = `# BHARAT GPT: 0% TO 100% COMPLETE BUILD, ARCHITECTURE & DEPLOYMENT MASTER GUIDE
+export const ZERO_TO_HERO_MASTER_GUIDE = `# PRAJNA BHARAT GPT: 0% TO 100% COMPLETE BUILD, ARCHITECTURE & DEPLOYMENT MASTER GUIDE
 
 ---
 
 ## 🏛️ 1. OVERVIEW & CIVILIZATIONAL VISION (0% - 10%)
 
-### What is Bharat GPT?
-**Bharat GPT (भारत ज्ञान प्रकाश)** is a modern, high-performance, full-stack Indic Artificial Intelligence & Civilizational Knowledge Web Application. It bridges ancient Indian heritage (Vedas, Upanishads, Bhagavad Gita, Epics, Sanskrit science, architecture, astronomy, and Ayurveda) with cutting-edge Generative AI powered by Google DeepMind's **Gemini 3.7 Flash**.
+### What is Prajna BharatGPT?
+**Prajna BharatGPT (प्रज्ञा भारत ज्ञान प्रकाश)** is a modern, high-performance, full-stack Indic Artificial Intelligence & Civilizational Knowledge Web Application. It bridges ancient Indian heritage (Vedas, Upanishads, Bhagavad Gita, Epics, Sanskrit science, architecture, astronomy, and Ayurveda) with cutting-edge Generative AI powered by Google DeepMind's **Gemini 3.7 Flash**.
 
 ### Core Pillars:
 1. **Indic Civilizational AI Engine (संवाद)**: Five contextual personas (*Vedic Scholar, Forest Hermitage Sage, Imperial Chronicler, Ancient Scientist, Mythological Bard*) with dynamic temperature, token limits, and authentic Indic thinking models.
@@ -82,7 +82,7 @@ export const ZERO_TO_HERO_MASTER_GUIDE = `# BHARAT GPT: 0% TO 100% COMPLETE BUIL
 - **Admin Email**: \`manavhulsure80@gmail.com\`
 - **Admin Password / PIN**: \`Bharatgpt@sarm\`
 - **Capabilities**:
-  - Full access to all 7 Bharat GPT modules.
+  - Full access to all 7 Prajna BharatGPT modules.
   - Access to the dedicated **Admin Control Panel**.
   - Ability to view and manage all registered user accounts.
   - Ability to change the Admin Email ID and Password at any time.
@@ -111,7 +111,7 @@ npm -v
 
 ### Step 2: Extract & Open Project
 \`\`\`bash
-cd bharat-gpt-app
+cd prajna-bharatgpt-app
 \`\`\`
 
 ### Step 3: Install Dependencies
@@ -144,7 +144,7 @@ Open your browser at: **\`http://localhost:3000\`**
    \`\`\`
 2. **Build and Deploy with Cloud Build**:
    \`\`\`bash
-   gcloud run deploy bharat-gpt \\
+   gcloud run deploy prajna-bharatgpt \\
      --source . \\
      --platform managed \\
      --region asia-east1 \\
@@ -157,16 +157,16 @@ Open your browser at: **\`http://localhost:3000\`**
    \`\`\`bash
    git init
    git add .
-   git commit -m "Initial Bharat GPT Release"
+   git commit -m "Initial Prajna BharatGPT Release"
    git branch -M main
-   git remote add origin https://github.com/your-username/bharat-gpt.git
+   git remote add origin https://github.com/your-username/prajna-bharatgpt.git
    git push -u origin main
    \`\`\`
 2. Go to [Vercel](https://vercel.com) -> **Add New Project** -> Import GitHub Repo.
 3. Add Environment Variable:
    - Name: \`GEMINI_API_KEY\`
    - Value: \`your_gemini_api_key\`
-4. Click **Deploy**. Vercel will automatically build the static bundle and assign a custom HTTPS domain (e.g., \`https://bharat-gpt.vercel.app\`).
+4. Click **Deploy**. Vercel will automatically build the static bundle and assign a custom HTTPS domain (e.g., \`https://prajna-bharatgpt.vercel.app\`).
 
 ### Option C: Deploy with Docker Container
 Create a \`Dockerfile\` in the root:
@@ -185,20 +185,20 @@ CMD ["nginx", "-g", "daemon off;"]
 \`\`\`
 Build & run:
 \`\`\`bash
-docker build -t bharat-gpt:latest .
-docker run -p 3000:80 bharat-gpt:latest
+docker build -t prajna-bharatgpt:latest .
+docker run -p 3000:80 prajna-bharatgpt:latest
 \`\`\`
 
 ---
 
-## 🌟 7. HOW TO MAKE BHARAT GPT A SCALABLE SUCCESS (90% - 100%)
+## 🌟 7. HOW TO MAKE PRAJNA BHARATGPT A SCALABLE SUCCESS (90% - 100%)
 
 1. **Persistent Cloud Database (Firebase / Cloud SQL)**:
    - Connect Firestore to sync user profiles and bookmarked vaults across multiple devices.
 2. **Voice Recognition & Speech Synthesis**:
    - Integrate Web Speech API or Gemini Live Audio for natural Sanskrit/Hindi vocal dialogue.
 3. **Custom Domain & Branding**:
-   - Link a domain like \`bharatgpt.ai\` or \`bharatgpt.in\` via Google Cloud DNS or Cloudflare.
+   - Link a domain like \`prajnabharatgpt.ai\` or \`prajnabharatgpt.in\` via Google Cloud DNS or Cloudflare.
 4. **Community Contributed Epics**:
    - Enable users to submit local regional folk tales, temple histories, and philosophical commentaries.
 

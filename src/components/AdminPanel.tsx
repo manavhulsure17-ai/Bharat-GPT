@@ -35,6 +35,7 @@ import { ZERO_TO_HERO_MASTER_GUIDE } from "../data/masterGuideData";
 import { generateFullProjectZip } from "../services/zipExportService";
 import { soundscape } from "../services/audioSynth";
 import { AdminAnalyticsDashboard } from "./AdminAnalyticsDashboard";
+import { toast } from "../services/toastService";
 
 interface AdminPanelProps {
   currentUser: AppUser;
@@ -66,12 +67,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       const updated = updateAdminCredentials(newAdminEmail, newAdminPassword);
       setAdminCreds(updated);
       soundscape.playTempleBell();
+      toast.success("Super Admin credentials updated successfully!", { title: "Security" });
       setAdminUpdateMsg({
         text: "Super Admin credentials updated and persisted successfully!",
         type: "success",
       });
       if (onAdminCredsUpdated) onAdminCredsUpdated();
     } catch (err: any) {
+      toast.error(err.message || "Failed to update admin credentials.", { title: "Update Error" });
       setAdminUpdateMsg({
         text: err.message || "Failed to update admin credentials.",
         type: "error",
@@ -84,6 +87,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       const updated = deleteUserByAdmin(userId);
       setUsersList(updated);
       soundscape.playTempleBell();
+      toast.info(`User "${userName}" has been removed.`, { title: "User Removed" });
     }
   };
 
@@ -100,9 +104,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       element.click();
       element.remove();
       soundscape.playTempleBell();
+      toast.success("Downloaded complete project codebase & assets as ZIP!", { title: "ZIP Export" });
     } catch (e) {
       console.error("ZIP export failed", e);
-      alert("Failed to generate ZIP package.");
+      toast.error("Failed to generate ZIP package.", { title: "Export Error" });
     } finally {
       setIsZipping(false);
     }
@@ -112,16 +117,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     const element = document.createElement("a");
     const file = new Blob([ZERO_TO_HERO_MASTER_GUIDE], { type: "text/markdown" });
     element.href = URL.createObjectURL(file);
-    element.download = "BharatGPT_Zero_to_100_Master_Build_and_Deployment_Guide.md";
+    element.download = "Prajna_BharatGPT_Zero_to_100_Master_Build_and_Deployment_Guide.md";
     document.body.appendChild(element);
     element.click();
     element.remove();
     soundscape.playTempleBell();
+    toast.success("Master Build & Deployment Guide downloaded!", { title: "Guide Downloaded" });
   };
 
   const handleCopyText = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopiedCode(id);
+    toast.success("Command copied to clipboard!", { title: "Copied" });
     setTimeout(() => setCopiedCode(null), 2000);
   };
 
@@ -147,7 +154,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="font-royal text-xl sm:text-2xl font-bold text-amber-100">
-                  Bharat GPT Super Admin Console
+                  Prajna BharatGPT Super Admin Console
                 </h2>
                 <span className="text-[10px] uppercase font-bold tracking-widest bg-amber-500 text-slate-950 px-2 py-0.5 rounded-full font-mono">
                   Master Root
@@ -229,7 +236,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <span>Registered Users Directory</span>
               </h3>
               <p className="text-xs text-amber-300/70">
-                View, audit, and manage user accounts created in Bharat GPT.
+                View, audit, and manage user accounts created in Prajna BharatGPT.
               </p>
             </div>
 
@@ -414,7 +421,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             <div>
               <h3 className="font-royal text-lg sm:text-xl font-bold text-amber-200 flex items-center gap-2">
                 <BookOpen className="w-5 h-5 text-amber-400" />
-                <span>Bharat GPT: 0% to 100% Complete Master Build & Deployment Guide</span>
+                <span>Prajna BharatGPT: 0% to 100% Complete Master Build & Deployment Guide</span>
               </h3>
               <p className="text-xs text-amber-300/70">
                 A complete zero-to-hero manual explaining the architecture, dependencies, local setup, and production hosting.
@@ -450,7 +457,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <span>Civilizational Architecture & Model Integration</span>
               </h4>
               <p className="text-amber-200/80">
-                Bharat GPT connects to Google DeepMind's <strong>Gemini 3.7 Flash</strong> using the modern <code className="text-amber-300 font-mono">@google/genai</code> SDK. It features 5 specialized Indic personas with customized system prompts:
+                Prajna BharatGPT connects to Google DeepMind's <strong>Gemini 3.7 Flash</strong> using the modern <code className="text-amber-300 font-mono">@google/genai</code> SDK. It features 5 specialized Indic personas with customized system prompts:
               </p>
               <ul className="list-disc list-inside space-y-1 text-amber-300/90 pl-2">
                 <li><strong>Vedic Scholar (आचार्य)</strong>: Direct Sanskrit references, Upanishadic context, and metaphysical clarity.</li>

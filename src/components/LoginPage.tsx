@@ -15,6 +15,7 @@ import {
 import { registerUser, loginUser } from "../services/authService";
 import { AppUser, AppTheme } from "../types";
 import { soundscape } from "../services/audioSynth";
+import { SacredParticlesBackground } from "./SacredParticlesBackground";
 
 interface LoginPageProps {
   onLoginSuccess: (user: AppUser) => void;
@@ -59,7 +60,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
         const newUser = registerUser(name, email, pin);
         soundscape.playTempleBell();
-        setSuccessMsg(`Welcome to Bharat GPT, ${newUser.name}! Your account has been created.`);
+        setSuccessMsg(`Welcome to Prajna BharatGPT, ${newUser.name}! Your account has been created.`);
         setTimeout(() => {
           onLoginSuccess(newUser);
         }, 600);
@@ -92,6 +93,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         isLight ? "bg-[#faf7f2] text-stone-900" : "bg-[#070b14] text-amber-100"
       }`}
     >
+      {/* Subtle Interactive Sacred Background Particles (Om & Lotus) */}
+      <SacredParticlesBackground theme={theme} />
+
       {/* Background Decorative Ambient Gradients */}
       <div className="absolute -top-40 -left-40 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-orange-600/10 rounded-full blur-3xl pointer-events-none" />
@@ -123,7 +127,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 isLight ? "text-amber-950" : "text-saffron-gradient"
               }`}
             >
-              BHARAT GPT
+              PRAJNA BHARAT GPT
             </h1>
             <p className={`text-[11px] font-indic ${isLight ? "text-stone-600" : "text-amber-300/70"}`}>
               भारत ज्ञान प्रकाश • Indic Civilizational AI
@@ -182,7 +186,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               <KeyRound className="w-6 h-6 text-amber-500" />
             </div>
             <h2 className={`font-royal text-xl sm:text-2xl font-bold ${isLight ? "text-amber-950" : "text-amber-100"}`}>
-              {isRegisterMode ? "Create Bharat GPT Account" : "Sign In to Bharat GPT"}
+              {isRegisterMode ? "Create Prajna BharatGPT Account" : "Sign In to Prajna BharatGPT"}
             </h2>
             <p className={`text-xs ${isLight ? "text-stone-600" : "text-amber-300/70"}`}>
               {isRegisterMode
@@ -340,7 +344,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               disabled={isLoading}
               className="w-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-bold py-3 rounded-xl text-xs sm:text-sm shadow-lg shadow-amber-950/40 transition-all flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
             >
-              <span>{isRegisterMode ? "Create Account & Enter" : "Sign In to Bharat GPT"}</span>
+              <span>{isRegisterMode ? "Create Account & Enter" : "Sign In to Prajna BharatGPT"}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
@@ -350,7 +354,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       {/* Footer */}
       <footer className="p-4 text-center text-xs text-amber-400/60 border-t border-amber-500/10 bg-[#0c111e]/50 backdrop-blur-sm relative z-10">
         <p>
-          ॐ Bharat GPT • Preserving Sacred Indian Heritage & Philosophy with Modern Artificial Intelligence
+          ॐ Prajna BharatGPT • Preserving Sacred Indian Heritage & Philosophy with Modern Artificial Intelligence
         </p>
       </footer>
     </div>

@@ -37,7 +37,7 @@ export function exportVaultToPDF(items: SavedItem[], options?: PDFExportOptions)
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
     doc.setTextColor(180, 83, 9); // Amber-700
-    doc.text("BHARAT GPT • SMRITI KOSH WISDOM VAULT", margin + 3, 12);
+    doc.text("PRAJNA BHARAT GPT • SMRITI KOSH WISDOM VAULT", margin + 3, 12);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(120, 120, 120);
     doc.text("Offline Reading Collection", pageWidth - margin - 3, 12, { align: "right" });
@@ -57,7 +57,7 @@ export function exportVaultToPDF(items: SavedItem[], options?: PDFExportOptions)
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8);
       doc.setTextColor(130, 130, 130);
-      doc.text("Preserving Indian Heritage, Philosophy & Ancient Sciences • Bharat GPT", margin, pageHeight - 7);
+      doc.text("Preserving Indian Heritage, Philosophy & Ancient Sciences • Prajna BharatGPT", margin, pageHeight - 7);
       doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin, pageHeight - 7, { align: "right" });
     }
   };
@@ -77,7 +77,7 @@ export function exportVaultToPDF(items: SavedItem[], options?: PDFExportOptions)
   doc.setFont("helvetica", "bold");
   doc.setFontSize(18);
   doc.setTextColor(255, 237, 213); // Amber-100
-  doc.text("BHARAT GPT — SMRITI KOSH", margin + 8, cursorY + 11);
+  doc.text("PRAJNA BHARAT GPT — SMRITI KOSH", margin + 8, cursorY + 11);
 
   // Subtitle
   doc.setFont("helvetica", "normal");
@@ -293,7 +293,7 @@ export function exportVaultToPDF(items: SavedItem[], options?: PDFExportOptions)
   drawPageFooters();
 
   // Save the document to download
-  const safeFilename = `Bharat_GPT_Smriti_Vault_${Date.now()}.pdf`;
+  const safeFilename = `Prajna_BharatGPT_Smriti_Vault_${Date.now()}.pdf`;
   doc.save(safeFilename);
 }
 
