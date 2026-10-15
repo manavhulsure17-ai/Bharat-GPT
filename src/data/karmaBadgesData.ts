@@ -176,4 +176,15 @@ export const MASTER_BADGES: UserBadge[] = [
     unlocked: false,
     rarity: "Legendary",
   },
+  {
+    id: "sankalpa-sadhaka",
+    name: "Sankalpa Sadhaka",
+    indicName: "संकल्प साधक",
+    icon: "🔥",
+    category: "wisdom",
+    description: "Steadfast in conscious spiritual resolve, fulfilling daily intentions and contemplative journaling.",
+    criteria: "Inscribe and fulfill sacred daily Sankalpa intentions.",
+    unlocked: false,
+    rarity: "Sacred",
+  },
 ];

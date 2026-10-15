@@ -19,7 +19,12 @@ class ToastManager {
 
   public subscribe(listener: ToastListener): () => void {
     this.listeners.add(listener);
-    listener([...this.toasts]);
+    const initialList = [...this.toasts];
+    setTimeout(() => {
+      if (this.listeners.has(listener)) {
+        listener(initialList);
+      }
+    }, 0);
     return () => {
       this.listeners.delete(listener);
     };
@@ -27,7 +32,15 @@ class ToastManager {
 
   private notify() {
     const list = [...this.toasts];
-    this.listeners.forEach((listener) => listener(list));
+    setTimeout(() => {
+      this.listeners.forEach((listener) => {
+        try {
+          listener(list);
+        } catch (e) {
+          console.error("Toast listener notification error:", e);
+        }
+      });
+    }, 0);
   }
 
   public show(

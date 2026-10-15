@@ -3,6 +3,8 @@ import { SHLOKA_WISDOM_COLLECTION } from "../data/shlokasData";
 import { VEDIC_WISDOM_COLLECTION } from "../data/vedicWisdomData";
 import { HERITAGE_ITEMS } from "../data/heritageData";
 import { BHARAT_HISTORY_CHRONICLES } from "../data/todayInHistoryData";
+import { VEDIC_AFFIRMATIONS_COLLECTION } from "../data/vedicAffirmationsData";
+import { SANKALPA_PRESETS } from "../data/sankalpaPresetsData";
 import { NavigationTab, SavedItem } from "../types";
 
 export type SearchDomain = "all" | "gita" | "story" | "history";
@@ -356,6 +358,69 @@ function buildSearchIndex(): SearchResultItem[] {
         event.era.toLowerCase(),
         event.year ? event.year.toLowerCase() : "",
         ...(event.historicalFigures || []).map((f) => f.toLowerCase()),
+      ],
+    });
+  });
+
+  // 7. Index Vedic Daily Affirmations & Inspiring Sankalpas
+  VEDIC_AFFIRMATIONS_COLLECTION.forEach((item) => {
+    index.push({
+      id: `affirmation-${item.id}`,
+      domain: "gita",
+      subCategory: "Vedic Affirmation",
+      title: `${item.theme} • ${item.source}`,
+      indicTitle: item.sanskrit.split("\n")[0] || item.themeIndic,
+      badge: "Vedic Affirmation",
+      snippet: `Affirmation: "${item.dailyAffirmation}"`,
+      details: `Translation: "${item.englishTranslation}" | Reflection: ${item.reflectionPrompt}`,
+      keyVerseOrPrompt: `Explain the Vedic affirmation from ${item.source}: "${item.sanskrit}" — "${item.englishTranslation}" and how to practice this Sankalpa daily.`,
+      targetTab: "chat",
+      targetPayload: {
+        askPrompt: `Explore the sacred Vedic affirmation from ${item.source} (${item.theme}): "${item.sanskrit}". Translation: "${item.englishTranslation}". How can I apply this daily Sankalpa in my life?`,
+      },
+      tags: [
+        "affirmation",
+        "sankalpa",
+        "vedic affirmation",
+        "daily affirmation",
+        "shloka",
+        item.theme.toLowerCase(),
+        item.category.toLowerCase(),
+        item.source.toLowerCase(),
+        "sanskrit",
+        "inspiration",
+        "mantra",
+      ],
+    });
+  });
+
+  // 8. Index Sacred Sankalpa Intentions
+  SANKALPA_PRESETS.forEach((preset) => {
+    index.push({
+      id: `sankalpa-preset-${preset.id}`,
+      domain: "gita",
+      subCategory: "Sankalpa Intention",
+      title: `${preset.title} • ${preset.scriptureReference}`,
+      indicTitle: preset.indicTitle,
+      badge: "Sankalpa Intention",
+      snippet: `Vow: "${preset.title}" | Mantra: ॐ ${preset.mantraOrAffirmation}`,
+      details: `Spiritual purpose: ${preset.whyItMatters} | Scripture: ${preset.scriptureReference}`,
+      keyVerseOrPrompt: `Explain how to practice the spiritual Sankalpa "${preset.title}" based on ${preset.scriptureReference} in modern daily life.`,
+      targetTab: "sankalpa",
+      targetPayload: {
+        askPrompt: `Explore how to practice the spiritual Sankalpa "${preset.title}" (${preset.indicTitle}) based on ${preset.scriptureReference}.`,
+      },
+      tags: [
+        "sankalpa",
+        "intention",
+        "spiritual vow",
+        "sadhana",
+        preset.title.toLowerCase(),
+        preset.category.toLowerCase(),
+        preset.scriptureReference.toLowerCase(),
+        "mantra",
+        "discipline",
+        "peace",
       ],
     });
   });

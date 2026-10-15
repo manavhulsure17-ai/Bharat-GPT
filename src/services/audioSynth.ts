@@ -89,7 +89,12 @@ class IndianSoundscapeService {
 
   public subscribeSoundscape(listener: SoundscapeListener): () => void {
     this.soundscapeListeners.add(listener);
-    listener(this.getSoundscapeState());
+    const initial = this.getSoundscapeState();
+    setTimeout(() => {
+      if (this.soundscapeListeners.has(listener)) {
+        listener(initial);
+      }
+    }, 0);
     return () => {
       this.soundscapeListeners.delete(listener);
     };
@@ -106,19 +111,20 @@ class IndianSoundscapeService {
 
   private notifySoundscape() {
     const state = this.getSoundscapeState();
-    this.soundscapeListeners.forEach((fn) => {
-      try {
-        fn(state);
-      } catch (e) {
-        console.error("Soundscape listener error:", e);
-      }
-    });
+    setTimeout(() => {
+      this.soundscapeListeners.forEach((fn) => {
+        try {
+          fn(state);
+        } catch (e) {
+          console.error("Soundscape listener error:", e);
+        }
+      });
+    }, 0);
   }
 
   public subscribe(listener: SpeechStateListener): () => void {
     this.listeners.add(listener);
-    // Initial notification
-    listener({
+    const initial: SpeechState = {
       isSpeaking: this.isSpeechActive,
       isPaused: this.isSpeechPaused,
       speakingId: this.currentSpeakingId,
@@ -130,7 +136,12 @@ class IndianSoundscapeService {
           ? Math.round((this.currentUtteranceIndex / this.speechUtteranceQueue.length) * 100)
           : 0,
       playbackRate: this.currentPlaybackRate,
-    });
+    };
+    setTimeout(() => {
+      if (this.listeners.has(listener)) {
+        listener(initial);
+      }
+    }, 0);
     return () => {
       this.listeners.delete(listener);
     };

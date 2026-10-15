@@ -89,12 +89,25 @@ class KarmaService {
 
   private notify() {
     const clone = this.getProfile();
-    this.listeners.forEach((listener) => listener(clone));
+    setTimeout(() => {
+      this.listeners.forEach((listener) => {
+        try {
+          listener(clone);
+        } catch (e) {
+          console.error("Karma listener error:", e);
+        }
+      });
+    }, 0);
   }
 
   public subscribe(listener: KarmaListener): () => void {
     this.listeners.add(listener);
-    listener(this.getProfile());
+    const initial = this.getProfile();
+    setTimeout(() => {
+      if (this.listeners.has(listener)) {
+        listener(initial);
+      }
+    }, 0);
     return () => {
       this.listeners.delete(listener);
     };
@@ -299,6 +312,14 @@ class KarmaService {
     // 11. Brahmarshi (Level 5, 1500+ points)
     if (totalPoints >= 1500) {
       this.unlockBadge("brahmarshi");
+    }
+
+    // 12. Sankalpa Sadhaka (Daily spiritual intention)
+    if (
+      (stats.sankalpasFulfilled && stats.sankalpasFulfilled >= 1) ||
+      (stats.sankalpasSet && stats.sankalpasSet >= 2)
+    ) {
+      this.unlockBadge("sankalpa-sadhaka");
     }
   }
 

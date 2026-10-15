@@ -6,7 +6,8 @@ export type NavigationTab =
   | "quiz"
   | "translate"
   | "vault"
-  | "admin";
+  | "admin"
+  | "sankalpa";
 
 export type PersonaType = "scholar" | "sage" | "chronicler" | "sciences" | "storyteller";
 
@@ -272,6 +273,7 @@ export type KarmaCategory =
   | "vault"
   | "dialogue"
   | "streak"
+  | "sankalpa"
   | "general";
 
 export interface KarmaLogItem {
@@ -312,6 +314,8 @@ export interface UserKarmaProfile {
     quizzesCompleted: number;
     translationsDone: number;
     vaultItemsSaved: number;
+    sankalpasSet?: number;
+    sankalpasFulfilled?: number;
   };
 }
 
@@ -327,4 +331,61 @@ export interface ToastNotification {
     onClick: () => void;
   };
 }
+
+// ========================
+// Sankalpa (Spiritual Intention) Journal Types
+// ========================
+
+export type SankalpaCategory =
+  | "shanti"    // Peace, Equanimity & Contentment (शांति व संतोष)
+  | "satya"     // Truth, Mindful & Pure Speech (सत्य व वाक्-शुद्धि)
+  | "tapas"     // Spiritual Discipline & Sadhana (तप व साधना)
+  | "karuna"    // Compassion & Selfless Service (करुणा व सेवा)
+  | "vairagya"  // Non-attachment & Surrender (वैराग्य व समर्पण)
+  | "dhairya"   // Courage, Resilience & Vitality (धैर्य व आंतरिक बल)
+  | "swadhyaya"; // Self-Study & Sacred Wisdom (स्वाध्याय व ज्ञान)
+
+export type SankalpaFulfillmentStatus =
+  | "in_progress"
+  | "fulfilled"
+  | "partially_fulfilled"
+  | "carried_forward";
+
+export interface SankalpaItem {
+  id: string;
+  title: string;
+  indicTitle?: string;
+  category: SankalpaCategory;
+  categoryLabel?: string;
+  categoryIndic?: string;
+  targetDate: string; // YYYY-MM-DD
+  status: SankalpaFulfillmentStatus;
+  mantraOrAffirmation?: string;
+  whyItMatters?: string;
+  reflectionNotes?: string;
+  audioTranscribed?: boolean;
+  fulfilledAt?: string;
+  createdAt: string;
+  pointsAwarded?: number;
+}
+
+export interface SankalpaWisdomReminder {
+  id: string;
+  source: string;
+  shlokaSanskrit: string;
+  shlokaTransliteration: string;
+  shlokaTranslation: string;
+  virtueTheme: string;
+  guidanceText: string;
+  progressReflection: string;
+  microPractice: {
+    title: string;
+    duration: string;
+    instruction: string;
+  };
+  dailyNudge: string;
+  timestamp: string;
+  isAiGenerated: boolean;
+}
+
 

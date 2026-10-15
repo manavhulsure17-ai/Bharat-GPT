@@ -93,6 +93,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   const navItems: { id: NavigationTab; label: string; indic: string; icon: any }[] = [
     { id: "chat", label: "Bharat AI Chat", indic: "संवाद", icon: MessageSquare },
+    { id: "sankalpa", label: "Sankalpa Journal", indic: "संकल्प", icon: Flame },
     { id: "explorer", label: "Heritage Explorer", indic: "विरासत", icon: Compass },
     { id: "story", label: "Katha Storyteller", indic: "कथा-वाचन", icon: Scroll },
     { id: "gita", label: "Gita & Wisdom", indic: "गीता श्लोक", icon: BookOpen },

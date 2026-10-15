@@ -13,8 +13,11 @@ import { DeploymentModal } from "./components/DeploymentModal";
 import { GlobalSearchModal } from "./components/GlobalSearchModal";
 import { KarmaBadgeModal } from "./components/KarmaBadgeModal";
 import { Footer } from "./components/Footer";
+import { VedicDailyAffirmation } from "./components/VedicDailyAffirmation";
 import { VedicWisdomWidget } from "./components/VedicWisdomWidget";
 import { TodayInHistoryCard } from "./components/TodayInHistoryCard";
+import { SankalpaSection } from "./components/SankalpaSection";
+import { SankalpaDashboardWidget } from "./components/SankalpaDashboardWidget";
 import { IndicLanguageCode, NavigationTab, SavedItem, AppUser, AppTheme, UserKarmaProfile } from "./types";
 import { SearchResultItem } from "./services/searchService";
 import { soundscape } from "./services/audioSynth";
@@ -219,6 +222,11 @@ export default function App() {
   };
 
   const handleNavigateSearchResult = (result: SearchResultItem) => {
+    if (result.targetTab === "sankalpa") {
+      setActiveTab("sankalpa");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
     if (result.domain === "gita") {
       if (result.targetPayload?.chapterNumber) {
         setSelectedGitaChapterNumber(result.targetPayload.chapterNumber);
@@ -306,9 +314,20 @@ export default function App() {
 
       {/* Main View Area */}
       <main className="flex-1 w-full pb-12">
-        {/* Daily-changing Today in History & Vedic Wisdom Widgets upon page load */}
-        {activeTab !== "admin" && (
+        {/* Daily-changing Vedic Affirmation, Sankalpa, Today in History & Vedic Wisdom Widgets upon page load */}
+        {activeTab !== "admin" && activeTab !== "sankalpa" && (
           <div className="space-y-4">
+            <VedicDailyAffirmation
+              selectedLanguage={selectedLanguage}
+              onSaveItem={handleSaveItem}
+              onAskAboutAffirmation={handleAskBharatGPTFromExplorer}
+              theme={theme}
+            />
+            <SankalpaDashboardWidget
+              onNavigateToSankalpa={() => setActiveTab("sankalpa")}
+              selectedLanguage={selectedLanguage}
+              theme={theme}
+            />
             <TodayInHistoryCard
               selectedLanguage={selectedLanguage}
               onSaveItem={handleSaveItem}
@@ -320,6 +339,15 @@ export default function App() {
               onAskAboutVerse={handleAskBharatGPTFromExplorer}
             />
           </div>
+        )}
+
+        {activeTab === "sankalpa" && (
+          <SankalpaSection
+            selectedLanguage={selectedLanguage}
+            onSaveItem={handleSaveItem}
+            onAskBharatGPT={handleAskBharatGPTFromExplorer}
+            theme={theme}
+          />
         )}
 
         {activeTab === "chat" && (

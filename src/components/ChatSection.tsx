@@ -920,7 +920,7 @@ export const ChatSection: React.FC<ChatSectionProps> = ({
           {isTranscribing && (
             <div className="mb-2 bg-amber-950/60 border border-amber-500/40 rounded-xl px-3 py-2 flex items-center gap-2 text-amber-300 text-xs">
               <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
-              <span>Transcribing audio with Gemini 3.5 Flash Speech-to-Text...</span>
+              <span>Transcribing audio with Gemini 3.5 Transcribe...</span>
             </div>
           )}
 

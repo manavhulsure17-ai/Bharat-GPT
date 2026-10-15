@@ -174,6 +174,67 @@ async function generateContentWithFallback(
   throw lastError || new Error("All Gemini models were unavailable");
 }
 
+function safeParseJson<T>(rawText: string): T {
+  if (!rawText || typeof rawText !== "string") {
+    throw new Error("Cannot parse empty or non-string response");
+  }
+
+  // 1. Direct strip of markdown code fences
+  const text = rawText
+    .replace(/^```(?:json)?\s*/gim, "")
+    .replace(/\s*```$/gim, "")
+    .trim();
+
+  // Try direct parse first
+  try {
+    return JSON.parse(text) as T;
+  } catch (initialErr) {
+    // 2. Extract substring between outermost { ... } or [ ... ]
+    const firstBrace = text.indexOf("{");
+    const firstBracket = text.indexOf("[");
+    let startIdx = -1;
+    let endChar = "";
+
+    if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
+      startIdx = firstBrace;
+      endChar = "}";
+    } else if (firstBracket !== -1) {
+      startIdx = firstBracket;
+      endChar = "]";
+    }
+
+    if (startIdx !== -1) {
+      const lastIdx = text.lastIndexOf(endChar);
+      if (lastIdx !== -1 && lastIdx > startIdx) {
+        const candidate = text.substring(startIdx, lastIdx + 1);
+        try {
+          return JSON.parse(candidate) as T;
+        } catch {
+          // Clean trailing commas before close braces/brackets
+          const sanitized = candidate.replace(/,\s*([\]}])/g, "$1");
+          try {
+            return JSON.parse(sanitized) as T;
+          } catch {}
+        }
+      }
+    }
+
+    // 3. Fallback: try matching JSON object or array regex
+    const match = text.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+    if (match) {
+      const candidate = match[0];
+      try {
+        return JSON.parse(candidate) as T;
+      } catch {
+        const sanitized = candidate.replace(/,\s*([\]}])/g, "$1");
+        return JSON.parse(sanitized) as T;
+      }
+    }
+
+    throw initialErr;
+  }
+}
+
 // Specialized Chat generator supporting Fast Flash-Lite, Search Grounding, and High Thinking Mode
 async function generateChatWithMode(
   client: GoogleGenAI,
@@ -448,7 +509,8 @@ Always uphold civilizational pride with scholarly precision, cultural depth, and
         });
       }
 
-      const models = ["gemini-3.7-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"];
+      // Model selection adhering to guidelines: 'gemini-3.5-transcribe' for Audio Transcription tasks
+      const models = ["gemini-3.5-transcribe", "gemini-3.7-flash", "gemini-3.1-flash-lite"];
       let transcription = "";
 
       for (const model of models) {
@@ -489,6 +551,149 @@ Always uphold civilizational pride with scholarly precision, cultural depth, and
     } catch (err: any) {
       console.error("Transcribe API error:", err);
       res.json({ text: "", error: "Transcription temporarily unavailable" });
+    }
+  });
+
+  // 1.8. Sankalpa AI Wisdom Reminder Endpoint
+  app.post("/api/sankalpa/wisdom-reminder", async (req, res) => {
+    try {
+      const {
+        intentions = [],
+        stats = {},
+        language = "English",
+        timeOfDay = "morning",
+      } = req.body;
+
+      const client = getGeminiClient();
+
+      const fallbackReminders = [
+        {
+          id: "rem-gita-6-5",
+          source: "Bhagavad Gita 6.5",
+          shlokaSanskrit: "उद्धरेदात्मनात्मानं नात्मानमवसादयेत् । आत्मैव ह्यात्मनो बन्धुरात्मैव रिपुरात्मनः ॥",
+          shlokaTransliteration: "uddhared ātmanātmānaṁ nātmānam avasādayet | ātmaiva hy ātmano bandhur ātmaiva ripur ātmanaḥ ||",
+          shlokaTranslation: "Elevate yourself through the power of your own mind, and never degrade yourself. For the mind is the supreme friend of the soul, and also its greatest adversary.",
+          virtueTheme: "Dhairya & Self-Mastery (धैर्य व आत्म-संयम)",
+          guidanceText: "In the Vedic tradition of Sankalpa, sacred resolve is not a demand placed upon yourself, but a consecration of your mind's latent strength. As Sri Krishna counsels Arjuna, your conscious intention transforms ordinary effort into luminous spiritual ascent.",
+          progressReflection: stats.streakDays && stats.streakDays > 1 
+            ? `You have held steady for ${stats.streakDays} consecutive days. Consistency (Abhyasa) purifies intention into natural habit.`
+            : "Every sacred sunrise offers a pristine canvas to realign your inner resolve with Dharmic purpose.",
+          microPractice: {
+            title: "2-Minute Antar-Trataka (Inner Focus)",
+            duration: "2 Minutes",
+            instruction: "Sit with a tall spine. Inhale gently counting to four; retain for two; exhale for six while mentally reciting your sacred intention. Notice the quiet stillness behind your thoughts."
+          },
+          dailyNudge: "Act with serene dedication today, remembering that devotion to the process brings peace beyond the fruits of action.",
+          isAiGenerated: false
+        },
+        {
+          id: "rem-yoga-sutra-1-12",
+          source: "Patanjali Yoga Sutras 1.12",
+          shlokaSanskrit: "अभ्यासवैराग्याभ्यां तन्निरोधः ॥",
+          shlokaTransliteration: "abhyāsa-vairāgyābhyāṁ tan-nirodhaḥ ||",
+          shlokaTranslation: "The steadying of the mind and mastery over fluctuations is achieved through continuous practice (Abhyasa) and unattached equanimity (Vairagya).",
+          virtueTheme: "Abhyasa & Vairagya (अभ्यास व वैराग्य)",
+          guidanceText: "Patanjali teaches that spiritual intentions bear fruit not through frantic force, but through repetitive, gentle return (Abhyasa) combined with letting go of anxieties over outcomes (Vairagya). When a distraction occurs today, gently guide your focus back without self-reproach.",
+          progressReflection: `With ${stats.fulfilledCount || 0} intentions fulfilled so far, each completed Sankalpa builds your inner vessel of spiritual Tapas.`,
+          microPractice: {
+            title: "Mindful Pause Before Speech (वाक्-संयम)",
+            duration: "1 Minute",
+            instruction: "Before speaking in your next conversation, take one conscious breath and ensure your words align with Satya (truth) and Priyam (uplifting kindness)."
+          },
+          dailyNudge: "When the mind wavers, do not struggle. Silently repeat your Sankalpa and let clarity reassert itself.",
+          isAiGenerated: false
+        }
+      ];
+
+      if (!client) {
+        const randomIndex = Math.floor(Math.random() * fallbackReminders.length);
+        return res.json({
+          ...fallbackReminders[randomIndex],
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      const promptContext = `
+Intentions currently tracked by seeker:
+${intentions.map((item: any, i: number) => `${i + 1}. [${item.category}] "${item.title}" - Status: ${item.status}${item.reflectionNotes ? ` (Reflection: ${item.reflectionNotes})` : ""}`).join("\n") || "No current intentions set yet - the seeker is beginning their daily journey."}
+
+Seeker's Spiritual Progress Metrics:
+- Current Streak: ${stats.streakDays || 1} days
+- Total Set: ${stats.totalCount || intentions.length}
+- Total Fulfilled: ${stats.fulfilledCount || 0}
+- Fulfillment Rate: ${stats.fulfillmentRate || 0}%
+- Preferred Language: ${language}
+- Time of Day: ${timeOfDay}
+`;
+
+      const systemInstruction = `You are a revered Vedic Acharya and Spiritual Mentor (मार्गदर्शक).
+Analyze the seeker's spiritual intentions (Sankalpas), reflections, and progress.
+Generate an uplifting, personalized, and authentic Vedic Wisdom Reminder.
+
+Language: Write guidance in ${language}. Keep the Sanskrit shloka authentic with Devanagari script, Roman transliteration, and translation.
+Output MUST be strictly valid JSON with this exact structure:
+{
+  "source": "Scripture citation (e.g. Bhagavad Gita 2.47 or Patanjali Yoga Sutra 2.1 or Isha Upanishad 1)",
+  "shlokaSanskrit": "Authentic Sanskrit shloka in Devanagari script",
+  "shlokaTransliteration": "Accurate IAST or Roman transliteration",
+  "shlokaTranslation": "Clear, poetic translation in ${language}",
+  "virtueTheme": "Primary Vedic virtue (e.g. Satya, Ahimsa, Tapas, Shanti, Santosha, Karuna, Dhairya, Vairagya)",
+  "guidanceText": "2-3 sentences of warm, profound spiritual counsel tailored specifically to their intentions and state of mind",
+  "progressReflection": "Empowering feedback acknowledging their streak or encouraging their effort without judgment",
+  "microPractice": {
+    "title": "Title of a 1 to 3-minute mindful practice or micro-ritual",
+    "duration": "1-3 Minutes",
+    "instruction": "Simple, step-by-step guidance for a quick breath, contemplative pause, or dharmic action"
+  },
+  "dailyNudge": "A memorable 1-sentence sacred aphorism or motto to remember today"
+}`;
+
+      const aiText = await generateContentWithFallback(client, {
+        contents: promptContext,
+        systemInstruction,
+        responseMimeType: "application/json",
+        temperature: 0.65,
+      });
+
+      const parsed = safeParseJson<any>(aiText);
+      res.json({
+        id: `wisdom-${Date.now()}`,
+        source: parsed.source || "Bhagavad Gita 2.47",
+        shlokaSanskrit: parsed.shlokaSanskrit || "कर्मण्येवाधिकारस्ते मा फलेषु कदाचन ।",
+        shlokaTransliteration: parsed.shlokaTransliteration || "karmaṇy-evādhikāras te mā phaleṣu kadācana |",
+        shlokaTranslation: parsed.shlokaTranslation || "You have a right to perform your prescribed duties, but never to the fruits of actions.",
+        virtueTheme: parsed.virtueTheme || "Karmayoga & Nishkama Karma",
+        guidanceText: parsed.guidanceText || "Focus your spirit on righteous action with love, surrendering outcome anxiety to the Divine.",
+        progressReflection: parsed.progressReflection || "Every conscious breath taken in awareness deepens your inner sanctuary.",
+        microPractice: parsed.microPractice || {
+          title: "3 Deep Conscious Breaths",
+          duration: "1 Minute",
+          instruction: "Inhale peace; exhale tension. Affirm your intention with a calm smile."
+        },
+        dailyNudge: parsed.dailyNudge || "Be steadfast in action, peaceful in heart.",
+        timestamp: new Date().toISOString(),
+        isAiGenerated: true,
+      });
+    } catch (err: any) {
+      console.error("Sankalpa Wisdom Reminder API error:", err);
+      res.json({
+        id: `wisdom-fallback-${Date.now()}`,
+        source: "Bhagavad Gita 2.47",
+        shlokaSanskrit: "कर्मण्येवाधिकारस्ते मा फलेषु कदाचन । मा कर्मफलहेतुर्भूर्मा ते सङ्गोऽस्त्वकर्मणि ॥",
+        shlokaTransliteration: "karmaṇy evādhikāras te mā phaleṣu kadācana | mā karma-phala-hetur bhūr mā te saṅgo 'stv akarmaṇi ||",
+        shlokaTranslation: "You have a right to your duty, but not to the fruits thereof. Do not consider yourself the cause of results, nor indulge in inaction.",
+        virtueTheme: "Nishkama Karma (निष्काम कर्म)",
+        guidanceText: "True Sankalpa thrives when action is performed as a sacred offering without fear or covetousness.",
+        progressReflection: "Keep walking your path with sincerity and tranquil trust.",
+        microPractice: {
+          title: "Prana Shuddhi Pause",
+          duration: "2 Minutes",
+          instruction: "Close your eyes, breathe gently into your heart space, and reaffirm your sacred resolve."
+        },
+        dailyNudge: "Act with dedicated devotion; release anxiety of tomorrow.",
+        timestamp: new Date().toISOString(),
+        isAiGenerated: false,
+      });
     }
   });
 
@@ -559,8 +764,7 @@ Output MUST be valid JSON conforming to this schema:
           temperature: 0.8,
         });
 
-        const cleaned = responseText.replace(/```json/gi, "").replace(/```/g, "").trim();
-        const storyData = JSON.parse(cleaned);
+        const storyData = safeParseJson<any>(responseText);
         return res.json(storyData);
       } catch (genErr) {
         console.warn("Story generation fallback triggered:", genErr);
@@ -650,8 +854,7 @@ Output MUST be valid JSON with this exact schema:
           temperature: 0.4,
         });
 
-        const cleaned = responseText.replace(/```json/gi, "").replace(/```/g, "").trim();
-        const parsed = JSON.parse(cleaned);
+        const parsed = safeParseJson<any>(responseText);
         setCache(cacheKey, parsed, 1000 * 60 * 60);
         return res.json(parsed);
       } catch (genErr) {
@@ -724,8 +927,7 @@ Output MUST be valid JSON with this schema:
           temperature: 0.3,
         });
 
-        const cleaned = responseText.replace(/```json/gi, "").replace(/```/g, "").trim();
-        const parsed = JSON.parse(cleaned);
+        const parsed = safeParseJson<any>(responseText);
         setCache(cacheKey, parsed, 1000 * 60 * 60);
         return res.json(parsed);
       } catch (genErr) {
@@ -815,8 +1017,7 @@ Output MUST be valid JSON matching this schema:
           temperature: 0.7,
         });
 
-        const cleaned = responseText.replace(/```json/gi, "").replace(/```/g, "").trim();
-        const parsed = JSON.parse(cleaned);
+        const parsed = safeParseJson<any>(responseText);
         setCache(cacheKey, parsed, 1000 * 60 * 15);
         return res.json(parsed);
       } catch (genErr) {
@@ -1172,8 +1373,7 @@ Output MUST be valid JSON with this exact schema:
             temperature: 0.6,
           });
 
-          const cleaned = responseText.replace(/```json/gi, "").replace(/```/g, "").trim();
-          const parsed = JSON.parse(cleaned);
+          const parsed = safeParseJson<any>(responseText);
 
           if (parsed && Array.isArray(parsed.events) && parsed.events.length > 0) {
             const responsePayload = {
